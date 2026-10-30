@@ -34,6 +34,12 @@ async function connect(agent) {
   return new URL(body.url).searchParams.get('state');
 }
 
+// Primero se obtiene el state y después se lanza la importación (dos peticiones, en orden).
+async function importWith(agent, code, status) {
+  const state = await connect(agent);
+  return agent.post('/api/bank/import').send({ code, state }).expect(status);
+}
+
 describe('importación bancaria (Tink)', () => {
   it('rechaza un state ausente, inventado o de otro usuario', async () => {
     const a = await registerUser();
@@ -58,7 +64,7 @@ describe('importación bancaria (Tink)', () => {
       ],
     });
 
-    const first = await u.agent.post('/api/bank/import').send({ code: 'c1', state: await connect(u.agent) }).expect(200);
+    const first = await importWith(u.agent, 'c1', 200);
     expect(first.body).toMatchObject({
       accounts: 1,
       fetched: 4,
@@ -77,7 +83,7 @@ describe('importación bancaria (Tink)', () => {
     ]);
 
     // Segunda importación con los mismos movimientos: nada nuevo.
-    const again = await u.agent.post('/api/bank/import').send({ code: 'c2', state: await connect(u.agent) }).expect(200);
+    const again = await importWith(u.agent, 'c2', 200);
     expect(again.body).toMatchObject({ imported: 0, duplicates: 2 });
     expect(await prisma.expense.count({ where: { userId: u.user.id } })).toBe(2);
 
@@ -92,7 +98,7 @@ describe('importación bancaria (Tink)', () => {
       accounts: 1,
       transactions: Array.from({ length: 7 }, (_, i) => tx(`q${i}`, '-100', `2026-03-0${i + 1}`)),
     });
-    const { body } = await u.agent.post('/api/bank/import').send({ code: 'c', state: await connect(u.agent) }).expect(200);
+    const { body } = await importWith(u.agent, 'c', 200);
     expect(body).toMatchObject({ imported: 5, skippedByQuota: 2 });
     const dates = (await prisma.expense.findMany({ where: { userId: u.user.id } })).map((e) => e.externalId).sort();
     expect(dates).toEqual(['q2', 'q3', 'q4', 'q5', 'q6']);
@@ -102,11 +108,11 @@ describe('importación bancaria (Tink)', () => {
     const u = await registerUser();
     const { AppError } = await import('../../src/lib/errors.js');
     tink.exchangeCode.mockRejectedValueOnce(new AppError(400, 'La autorización del banco ha caducado', 'BANK_AUTH'));
-    const res = await u.agent.post('/api/bank/import').send({ code: 'c', state: await connect(u.agent) }).expect(400);
+    const res = await importWith(u.agent, 'c', 400);
     expect(res.body.error.code).toBe('BANK_AUTH');
 
     tink.exchangeCode.mockRejectedValueOnce(new Error('ECONNRESET 10.0.0.1 detalles internos'));
-    const boom = await u.agent.post('/api/bank/import').send({ code: 'c', state: await connect(u.agent) }).expect(500);
+    const boom = await importWith(u.agent, 'c', 500);
     expect(boom.body.error.message).toBe('Error interno del servidor');
   });
 });

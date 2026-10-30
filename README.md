@@ -82,6 +82,8 @@ npm run client:dev
 
 Abre http://localhost:5173. Vite redirige `/api` a `http://localhost:5000`, así que el navegador trabaja siempre en el mismo origen.
 
+¿Quieres probarla sin tocar Atlas? `npm run dev:memory` arranca la API contra un MongoDB en memoria (se borra al parar) en lugar de `npm run dev`.
+
 Sin `ANTHROPIC_API_KEY` la app funciona igual: los gastos sin categoría van a «Otros» y el análisis IA responde que no está configurado. Sin las variables `TINK_*` la pestaña Banco lo indica.
 
 ### Migrar datos de la v1
@@ -106,7 +108,13 @@ npm test
 - **Unitarios**: dinero y fechas, agregaciones y presupuestos, CSV, parser y cliente de Tink, esquemas Zod, entorno, normalización de comercios.
 - **Integración** (API real contra MongoDB en memoria, Claude y Tink simulados): auth, aislamiento entre usuarios, validación, categorías, estadísticas, cuota FREE, caché de insights e importación bancaria.
 
-La primera ejecución descarga un binario de MongoDB (unos 800 MB en Windows). Nunca se toca tu base de datos real.
+La primera ejecución descarga un binario de MongoDB (unos 800 MB en Windows, casi todo símbolos de depuración). Nunca se toca tu base de datos real. Con una conexión lenta puedes usar un `mongod.exe` que ya tengas:
+
+```bash
+MONGOMS_SYSTEM_BINARY="C:/ruta/a/mongod.exe" npm test
+```
+
+`npm run test:unit` ejecuta solo los unitarios, sin MongoDB.
 
 ## API
 
