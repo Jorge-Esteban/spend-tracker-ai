@@ -42,7 +42,7 @@ El navegador solo habla con el dominio de Vercel: la cookie de sesión es *first
    | `NODE_ENV` | `production` |
    | `DATABASE_URL` | cadena de Atlas |
    | `JWT_SECRET` | 48+ bytes aleatorios: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
-   | `TRUST_PROXY` | `true` (Railway va detrás de un proxy; sin esto el rate limit ve una sola IP) |
+   | `TRUST_PROXY` | `2` (saltos de proxy: Vercel → Railway; sin esto el rate limit ve la IP de Vercel para todos) |
    | `APP_URL` | `https://tu-app.vercel.app` |
    | `CLIENT_ORIGIN` | `https://tu-app.vercel.app` |
    | `ANTHROPIC_API_KEY` | clave de la consola de Anthropic |
@@ -57,6 +57,8 @@ El navegador solo habla con el dominio de Vercel: la cookie de sesión es *first
 4. **Settings → Healthcheck path**: `/api/health`.
 5. **Settings → Networking → Generate domain** → apunta la URL (`https://tu-api.up.railway.app`).
 6. Comprueba: `curl https://tu-api.up.railway.app/api/health` → `{"status":"ok"}`.
+
+Nota sobre `TRUST_PROXY=2`: quien llame directamente a la URL de Railway (sin pasar por Vercel) puede falsear la cabecera `X-Forwarded-For` y esquivar el límite por IP de login. El límite de IA es por usuario y no se ve afectado, y las contraseñas siguen protegidas por bcrypt. Es un riesgo bajo y aceptado para esta fase.
 
 Si una variable falta o es inválida, la API **no arranca** y el log de Railway dice cuál (validación con Zod).
 

@@ -26,11 +26,9 @@ const EnvSchema = z.object({
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET debe tener al menos 32 caracteres'),
   JWT_EXPIRES_IN: z.string().default('7d'),
-  // true si la API corre detrás de un proxy (Railway) para que rate-limit vea la IP real.
-  TRUST_PROXY: z
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((v) => v === 'true'),
+  // Nº de proxies delante de la API, para que rate-limit vea la IP real del cliente.
+  // Vercel (rewrite) -> Railway = 2. En local, 0.
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
 
   ANTHROPIC_API_KEY: z.string().optional(),
   // Modelos configurables: categorizar a escala puede ir con un modelo más barato.

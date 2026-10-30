@@ -54,6 +54,8 @@ describe('parseEnv', () => {
     expect(env.CLIENT_ORIGIN).toEqual(['http://a.com', 'http://b.com']);
     expect(env.CLAUDE_MODEL_INSIGHTS).toBe('claude-opus-5-5');
     expect(env.PORT).toBe(5000);
+    expect(env.TRUST_PROXY).toBe(0);
+    expect(parseEnv({ ...base, TRUST_PROXY: '2' }).TRUST_PROXY).toBe(2);
   });
 
   it('falla con un JWT_SECRET corto o sin DATABASE_URL', () => {
