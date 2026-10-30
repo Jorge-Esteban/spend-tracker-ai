@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Spend Tracker AI v2 — esquema MongoDB (Prisma 6.19.x; Prisma 7 aún no soporta MongoDB).
+// Regla de oro: todo dato de negocio cuelga de un userId y toda consulta filtra por él.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,38 +10,141 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Expense {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  amount        Float
-  category      String
-  description   String?
-  merchant      String?
-  date          DateTime
-  paymentMethod String?
-  isRecurring   Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+enum Plan {
+  FREE
+  PRO
+}
 
-  @@map("expenses")
+enum ExpenseSource {
+  MANUAL
+  BANK
+}
+
+enum CategorizedBy {
+  USER
+  RULE
+  AI
+  FALLBACK
+}
+
+enum InsightKind {
+  INSIGHTS
+}
+
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String
+  name         String?
+  plan         Plan     @default(FREE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  categories    Category[]
+  expenses      Expense[]
+  merchantRules MerchantRule[]
+  insights      AiInsight[]
+  usage         UsageCounter[]
+
+  @@map("users")
 }
 
 model Category {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String   @unique
-  color       String?
-  icon        String?
-  budgetLimit Float?
-  createdAt   DateTime @default(now())
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String   @db.ObjectId
+  name               String
+  color              String   @default("#94a3b8")
+  icon               String   @default("🏷️")
+  // Presupuesto mensual en céntimos; null = sin presupuesto.
+  monthlyBudgetCents Int?
+  // La categoría "Otros": no se puede borrar y recibe los gastos huérfanos.
+  isFallback         Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses      Expense[]
+  merchantRules MerchantRule[]
+
+  @@unique([userId, name])
   @@map("categories")
 }
 
-model AnalysisCache {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  analysisType  String
-  data          String
-  createdAt     DateTime @default(now())
-  expiresAt     DateTime?
+model Expense {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String        @db.ObjectId
+  categoryId    String        @db.ObjectId
+  // Dinero siempre en céntimos enteros: nada de Float.
+  amountCents   Int
+  currency      String        @default("EUR")
+  description   String
+  merchant      String?
+  date          DateTime
+  source        ExpenseSource @default(MANUAL)
+  // Id de la transacción en el banco (Tink) para deduplicar importaciones.
+  externalId    String?
+  categorizedBy CategorizedBy @default(USER)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  @@map("analysis_cache")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@index([userId, date])
+  @@index([userId, externalId])
+  @@map("expenses")
+}
+
+// Regla aprendida cuando el usuario corrige la categoría de un comercio.
+model MerchantRule {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  // Comercio normalizado (minúsculas, sin espacios dobles).
+  merchantKey String
+  categoryId  String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, merchantKey])
+  @@map("merchant_rules")
+}
+
+// Caché de insights de IA: uno por usuario y tipo, válido 24 h o hasta que cambien los datos.
+model AiInsight {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String      @db.ObjectId
+  kind      InsightKind
+  // Hash del resumen enviado a Claude: si los datos cambian, el hash cambia.
+  dataHash  String
+  payload   Json
+  model     String
+  stale     Boolean     @default(false)
+  expiresAt DateTime
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@map("ai_insights")
+}
+
+// Contadores de cuota por usuario y periodo (YYYY-MM).
+model UsageCounter {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  period      String
+  // Transacciones creadas (manuales + importadas) en el periodo.
+  expenses    Int      @default(0)
+  // Llamadas de IA de insights en el periodo.
+  aiInsights  Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period])
+  @@map("usage_counters")
 }
