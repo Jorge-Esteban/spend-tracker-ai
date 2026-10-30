@@ -18,6 +18,11 @@ const monthFmt = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeri
 const shortMonthFmt = new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: 'UTC' });
 const monthDate = (key) => new Date(`${key}-01T00:00:00Z`);
 export const formatMonth = (key) => monthFmt.format(monthDate(key));
+// "octubre de 2026" -> "Octubre de 2026" (CSS capitalize pondría también "De").
+export const formatMonthTitle = (key) => {
+  const s = formatMonth(key);
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
 export const formatShortMonth = (key) => shortMonthFmt.format(monthDate(key));
 
 export function currentMonthKey() {

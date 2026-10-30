@@ -322,7 +322,6 @@ label {
 .month-label {
   min-width: 9rem;
   text-align: center;
-  text-transform: capitalize;
   font-weight: 600;
 }
 

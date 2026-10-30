@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { formatMonth, shiftMonth } from '../format.js';
+import { formatMonthTitle, shiftMonth } from '../format.js';
 
 export function Alert({ kind = 'info', children }) {
   return (
@@ -21,7 +21,7 @@ export function MonthPicker({ value, onChange }) {
       <button className="btn ghost" aria-label="Mes anterior" onClick={() => onChange(shiftMonth(value, -1))}>
         ‹
       </button>
-      <span className="month-label">{formatMonth(value)}</span>
+      <span className="month-label">{formatMonthTitle(value)}</span>
       <button className="btn ghost" aria-label="Mes siguiente" onClick={() => onChange(shiftMonth(value, 1))}>
         ›
       </button>
