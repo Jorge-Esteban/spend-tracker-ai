@@ -1,190 +1,147 @@
-# 💰 Spend Tracker AI
+# 💶 Spend Tracker AI · v2
 
-Un aplicación de seguimiento de gastos inteligente con análisis automático usando Claude AI.
+Control de gastos personal **multiusuario** con categorización automática e informes generados por **Claude**, presupuestos por categoría e importación bancaria por **Tink** (open banking).
 
-## 🚀 Características
+> Proyecto de portfolio (Business Analyst / desarrollo full-stack + IA). La v2 es una reescritura completa de la v1 tras una auditoría: ver [docs/AUDITORIA.md](docs/AUDITORIA.md).
 
-- ✅ Categorización automática de gastos con IA
-- 📊 Análisis inteligente de patrones de gasto
-- 🔮 Predicciones de gasto futuro
-- 💡 Recomendaciones personalizadas para ahorrar
-- 📈 Gráficos y resúmenes mensuales
-- 🏦 Preparado para integración bancaria (Plaid/Yapily)
-- 💾 Base de datos local SQLite
+## Qué hace
 
-## 📋 Requisitos
+- **Cuentas de usuario** con sesión en cookie httpOnly. Cada usuario solo ve sus datos.
+- **Gastos** manuales con búsqueda, paginación, filtro por mes y **exportación CSV** (lista para Excel en español).
+- **Categorización automática** en tres pasos: regla aprendida del comercio → Claude (en lote) → «Otros». Si corriges una categoría, la app crea una regla y no vuelve a preguntar a la IA por ese comercio.
+- **Categorías propias** con color, icono y **presupuesto mensual**. Estado del presupuesto: correcto, alerta (≥ 80 %) o superado.
+- **Resumen** con total del mes, comparación con el mes anterior, tendencia de 12 meses y reparto por categoría.
+- **Análisis con IA**: una sola llamada por usuario, cacheada 24 h. FREE recibe resumen, patrones y alertas; PRO además predicción del mes siguiente y recomendaciones de ahorro.
+- **Importación bancaria con Tink** (de momento solo con Demo Bank): deduplicación por id de transacción.
+- **Planes FREE / PRO**: FREE tiene un tope de 50 movimientos al mes. Ver [docs/MONETIZACION.md](docs/MONETIZACION.md).
+- Tema **claro / oscuro** que recuerda tu elección.
 
-- Node.js 18+
-- npm o yarn
-- Clave API de Anthropic (Claude)
+## Stack
 
-## 🔧 Instalación
+| Capa | Tecnología |
+|---|---|
+| Backend | Node.js (ESM), Express 5, Prisma 6.19 (MongoDB Atlas), Zod 4, pino, helmet, express-rate-limit |
+| IA | `@anthropic-ai/sdk` con salidas estructuradas (Zod) · modelos configurables por variable de entorno |
+| Banco | Tink Link + API Data v2 |
+| Frontend | Vite + React 19 + Recharts, CSS con variables |
+| Tests | Vitest + supertest + mongodb-memory-server (replica set) |
+| Despliegue | Railway (API) + Vercel (frontend, proxy `/api`) — ver [docs/DEPLOY.md](docs/DEPLOY.md) |
 
-### 1. Clonar/Descargar el proyecto
-```bash
-cd spend-tracker-ai
+> **¿Por qué Prisma 6 y no 7?** Prisma 7 todavía no soporta MongoDB; la versión está fijada a `~6.19.3`.
+
+## Arquitectura
+
+```
+src/
+├── app.js               createApp(): middlewares + rutas (sin listen, para tests)
+├── server.js            arranque y apagado limpio
+├── config/env.js        variables de entorno validadas con Zod
+├── lib/                 prisma, logger, errores, dinero (céntimos), fechas (UTC)
+├── middleware/          auth (JWT en cookie), errores, rate limits, validación de ids
+└── modules/
+    ├── auth/            registro, login, logout, me
+    ├── categories/      CRUD; borrar reasigna a «Otros»
+    ├── expenses/        CRUD, listado, CSV
+    ├── stats/           agregaciones puras + /api/stats
+    ├── ai/              cliente Claude, categorización, insights con caché
+    ├── bank/            Tink: cliente, parser v2 puro, state firmado, importación
+    └── usage/           cuotas por plan
+client/                  Vite + React (auth, gastos, resumen, presupuestos, análisis, banco, categorías)
+prisma/schema.prisma     modelos MongoDB
+scripts/claim-orphans.js migración de los datos de la v1
+tests/                   unitarios + integración
 ```
 
-### 2. Instalar dependencias
+Principios: **todo el dinero en céntimos enteros**, **toda consulta filtrada por `userId`**, el cliente **nunca** ve mensajes de error internos y **los secretos solo viven en `.env`**.
+
+## Puesta en marcha local
+
+Requisitos: Node.js **22 LTS** recomendado (funciona desde 20.11), una base de datos MongoDB (Atlas sirve) y, opcionalmente, claves de Anthropic y Tink.
+
 ```bash
 npm install
+npm --prefix client install
+cp .env.example .env        # rellena DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY...
 ```
 
-### 3. Configurar variables de entorno
-Crea un archivo `.env` en la raíz:
-```
-PORT=5000
-ANTHROPIC_API_KEY=tu_clave_api_aqui
-NODE_ENV=development
-```
-
-**Obtener API Key:**
-1. Ve a https://console.anthropic.com
-2. Crea una cuenta o inicia sesión
-3. En el dashboard, ve a "API Keys"
-4. Crea una nueva clave y cópiala
-5. Pégala en `.env`
-
-### 4. Iniciar el servidor
-```bash
-npm start
-```
-
-El servidor estará disponible en `http://localhost:5000`
-
-## 📡 API Endpoints
-
-### Gastos
-
-**GET /api/expenses**
-- Obtener todos los gastos
-- Parámetros: `category`, `month`, `year`
-
-**POST /api/expenses**
-- Crear nuevo gasto
-- Body:
-```json
-{
-  "amount": 25.50,
-  "description": "Café en Starbucks",
-  "date": "2024-01-15",
-  "merchant": "Starbucks",
-  "payment_method": "credit_card"
-}
-```
-
-**GET /api/expenses/:id**
-- Obtener gasto específico
-
-**PUT /api/expenses/:id**
-- Actualizar gasto
-
-**DELETE /api/expenses/:id**
-- Eliminar gasto
-
-### Resúmenes
-
-**GET /api/expenses/summary**
-- Resumen por categoría
-
-**GET /api/analysis/monthly-summary?month=01&year=2024**
-- Resumen mensual completo
-
-**GET /api/analysis/month-comparison**
-- Comparativa mes a mes
-
-### Análisis Inteligente
-
-**GET /api/analysis/spending-analysis**
-- Análisis completo de gastos con patrones
-
-**GET /api/analysis/predictions**
-- Predicciones de gasto futuro
-
-**GET /api/analysis/recommendations**
-- Recomendaciones personalizadas para ahorrar
-
-## 💻 Ejemplo de uso
+Crea los índices en tu base de datos (esto **escribe** en la base de datos de `DATABASE_URL`; si vienes de la v1 lee antes la sección de migración):
 
 ```bash
-# Crear un gasto
-curl -X POST http://localhost:5000/api/expenses \
-  -H "Content-Type: application/json" \
-  -d '{
-    "amount": 45.00,
-    "description": "Gasolina Repsol",
-    "date": "2024-01-15",
-    "merchant": "Repsol"
-  }'
-
-# Obtener análisis
-curl http://localhost:5000/api/analysis/spending-analysis?month=01&year=2024
-
-# Obtener predicciones
-curl http://localhost:5000/api/analysis/predictions
-
-# Obtener recomendaciones
-curl http://localhost:5000/api/analysis/recommendations
+npx prisma db push
 ```
 
-## 🔗 Próximos pasos - Integración Bancaria
+Arranca API y frontend en dos terminales:
 
-Para conectar con tu banco, necesitarás integrar Plaid o Yapily:
-
-### Opción 1: Plaid (Recomendado)
 ```bash
-npm install plaid
+npm run dev
 ```
-- Soporta 12,000+ instituciones
-- Muy seguro
-- Documentación completa
 
-### Opción 2: Yapily
 ```bash
-npm install yapily
-```
-- API abierta europea (PSD2)
-- Buena para bancos españoles
-
-Te ayudaré con esta integración cuando estés listo.
-
-## 📁 Estructura del proyecto
-
-```
-spend-tracker-ai/
-├── db/
-│   └── database.js         # Configuración SQLite
-├── routes/
-│   ├── expenses.js         # API de gastos
-│   └── analysis.js         # API de análisis
-├── services/
-│   └── claude.js           # Integración Claude AI
-├── server.js               # Servidor Express
-├── package.json
-├── .env                    # Variables de entorno
-└── README.md
+npm run client:dev
 ```
 
-## 🐛 Troubleshooting
+Abre http://localhost:5173. Vite redirige `/api` a `http://localhost:5000`, así que el navegador trabaja siempre en el mismo origen.
 
-**"ANTHROPIC_API_KEY no encontrada"**
-- Verifica que has puesto la clave en `.env`
-- Reinicia el servidor después de cambiar `.env`
+Sin `ANTHROPIC_API_KEY` la app funciona igual: los gastos sin categoría van a «Otros» y el análisis IA responde que no está configurado. Sin las variables `TINK_*` la pestaña Banco lo indica.
 
-**"Error de base de datos"**
-- Elimina `db/spending.db` y reinicia
-- Se recreará automáticamente
+### Migrar datos de la v1
 
-**"Puerto 5000 en uso"**
-- Cambia `PORT` en `.env` a otro número
-- O mata el proceso: `lsof -i :5000` y `kill -9 <PID>`
+Los gastos de la v1 no tenían usuario. El script es un simulacro salvo que pases `--apply`:
 
-## 📞 Soporte
+```bash
+node scripts/claim-orphans.js
+```
 
-Para problemas o preguntas sobre la API de Claude, visita:
-- https://docs.anthropic.com
-- https://console.anthropic.com
+1. `node scripts/claim-orphans.js --apply` → borra las categorías globales antiguas y su índice único por nombre (impedirían crear categorías por usuario).
+2. `npx prisma db push`
+3. Regístrate en la app.
+4. `node scripts/claim-orphans.js --email tu@email.com --apply` → asigna los gastos antiguos a tu usuario, pasa los importes a céntimos y enlaza las categorías.
 
-## 📄 Licencia
+## Tests
 
-MIT
+```bash
+npm test
+```
+
+- **Unitarios**: dinero y fechas, agregaciones y presupuestos, CSV, parser y cliente de Tink, esquemas Zod, entorno, normalización de comercios.
+- **Integración** (API real contra MongoDB en memoria, Claude y Tink simulados): auth, aislamiento entre usuarios, validación, categorías, estadísticas, cuota FREE, caché de insights e importación bancaria.
+
+La primera ejecución descarga un binario de MongoDB (unos 800 MB en Windows). Nunca se toca tu base de datos real.
+
+## API
+
+Todas las rutas salvo `auth` y `health` requieren sesión.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/health` | Estado |
+| POST | `/api/auth/register` · `/login` · `/logout` | Sesión |
+| GET | `/api/auth/me` | Usuario actual |
+| GET/POST | `/api/categories` | Listar / crear |
+| PATCH/DELETE | `/api/categories/:id` | Editar (incl. presupuesto) / borrar (reasigna a «Otros») |
+| GET/POST | `/api/expenses` | Listar (`month`, `q`, `categoryId`, `page`, `pageSize`) / crear |
+| GET/PATCH/DELETE | `/api/expenses/:id` | Detalle / editar / borrar |
+| GET | `/api/expenses/export.csv?month=YYYY-MM` | CSV del mes |
+| GET | `/api/stats?month=YYYY-MM` | Totales, presupuestos, tendencia, mes anterior, uso |
+| GET | `/api/insights` · POST `/api/insights/refresh` | Análisis IA (caché 24 h) |
+| GET | `/api/bank/status` · `/api/bank/connect-url` | Estado / URL de Tink Link |
+| POST | `/api/bank/import` | Canjea `code` + `state` e importa |
+| GET | `/api/usage` | Cuota del mes |
+
+Los errores siempre tienen la forma `{ "error": { "code", "message", "issues?" } }`.
+
+## Configuración de la IA
+
+Los modelos se eligen por entorno: `CLAUDE_MODEL_INSIGHTS` y `CLAUDE_MODEL_CATEGORIZE` (por defecto `claude-opus-5-5`). Categorizar es una tarea sencilla y repetitiva: usar `claude-haiku-5-5` ahí abarata mucho el coste por usuario, pero es una decisión de producto que conviene validar con datos reales. Las peticiones a modelos que lo admiten llevan activado el **fallback de servidor** (`fallbacks: "default"`) por si un clasificador de seguridad rechaza la petición.
+
+## Limitaciones conocidas
+
+- Tink solo con **Demo Bank**: la creación de apps de producción en Tink está deshabilitada para esta cuenta.
+- La forma de la respuesta de Tink Data v2 se ha implementado según la documentación y está cubierta por tests, pero **no se ha verificado en vivo**.
+- PRO todavía no tiene pasarela de pago: el plan se cambia a mano en la base de datos (hoja de ruta con Stripe en [docs/MONETIZACION.md](docs/MONETIZACION.md)).
+
+## Documentación
+
+- [docs/AUDITORIA.md](docs/AUDITORIA.md): qué se reescribió y por qué
+- [docs/DEPLOY.md](docs/DEPLOY.md): despliegue paso a paso (Railway + Vercel + Atlas) y rotación de secretos
+- [docs/MONETIZACION.md](docs/MONETIZACION.md): planes, precios y proyección
