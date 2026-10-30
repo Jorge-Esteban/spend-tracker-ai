@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite*
+dist/
+build/
+coverage/
+.claude/
+*.log
+.DS_Store
+.idea/
+.vscode/
+files.zip

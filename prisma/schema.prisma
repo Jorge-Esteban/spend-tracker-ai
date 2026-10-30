@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Expense {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  amount        Float
+  category      String
+  description   String?
+  merchant      String?
+  date          DateTime
+  paymentMethod String?
+  isRecurring   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("expenses")
+}
+
+model Category {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  color       String?
+  icon        String?
+  budgetLimit Float?
+  createdAt   DateTime @default(now())
+
+  @@map("categories")
+}
+
+model AnalysisCache {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  analysisType  String
+  data          String
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime?
+
+  @@map("analysis_cache")
+}
