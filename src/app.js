@@ -31,7 +31,17 @@ export function createApp() {
       credentials: true,
     }),
   );
-  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/health' } }));
+  app.use(
+    pinoHttp({
+      logger,
+      autoLogging: { ignore: (req) => req.url === '/api/health' },
+      // Solo lo necesario: nada de cabeceras (cookies, IPs, user agents) en cada línea.
+      serializers: {
+        req: (req) => ({ id: req.id, method: req.method, url: req.url?.split('?')[0] }),
+        res: (res) => ({ statusCode: res.statusCode }),
+      },
+    }),
+  );
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
   app.use('/api', generalLimiter);
