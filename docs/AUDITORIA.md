@@ -73,8 +73,11 @@ La v1 funcionaba como demo local pero tenía fallos que la hacían inutilizable 
 
 - Tink Data v2 con Demo Bank: canje del código, cuentas, paginación y forma de las transacciones (`amount.value.{unscaledValue,scale}`, `descriptions`, `dates.booked`, `types.type`, `status`). Una cuenta devolvió 2.000 movimientos: por eso ahora se piden solo los últimos 12 meses. Demo Bank usa `scale: "1"` (p. ej. `unscaledValue: "10800"` = 1.080,00 €), que el conversor con BigInt resuelve bien, y sus movimientos «Payment» llegan en positivo: se importan como ingresos.
 - Llamadas reales a Claude (categorización por tipo e insights FREE/PRO) con salidas estructuradas.
+- MongoDB Atlas real: `prisma db push` sobre la base `spendtracker` (estaba vacía: no había datos de la v1 que migrar) y prueba de punta a punta (registro, gasto, ingreso, categorización con Claude, estadísticas, CSV y transacciones). El usuario de prueba se borró después.
 
 ## Pendiente de verificar
 
-- La conexión con el Atlas real y el `prisma db push` sobre él (no se ha tocado la base de datos real).
-- Que los secretos filtrados en la v1 (contraseña de Mongo, client secret de Tink) están **rotados**. Ver [DEPLOY.md](DEPLOY.md#rotación-de-secretos).
+- El despliegue en Railway + Vercel (ver [DEPLOY.md](DEPLOY.md)).
+- Bancos reales con Tink: requiere una app de producción en Tink.
+
+La contraseña de Mongo y el client secret de Tink filtrados en la v1 ya se han rotado.
