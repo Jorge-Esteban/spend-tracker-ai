@@ -580,3 +580,7 @@ label {
     font-size: 1.25rem;
   }
 }
+.grow {
+  flex: 1;
+  min-width: 200px;
+}

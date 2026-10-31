@@ -20,7 +20,9 @@ export default function BankCallback({ onDone }) {
     window.history.replaceState({}, '', window.location.pathname);
 
     if (!code || !state) {
-      setError(params.get('message') || 'Tink no devolvió autorización (¿cancelaste la conexión?).');
+      setError(
+        params.get('error_description') || params.get('message') || 'El banco no devolvió autorización (¿cancelaste la conexión?).',
+      );
       return;
     }
     api
