@@ -94,10 +94,10 @@ Los gastos de la v1 no tenían usuario. El script es un simulacro salvo que pase
 node scripts/claim-orphans.js
 ```
 
-1. `node scripts/claim-orphans.js --apply` → borra las categorías globales antiguas y su índice único por nombre (impedirían crear categorías por usuario).
+1. `node scripts/claim-orphans.js --apply` → guarda una copia JSON de los datos antiguos en `backups/` y elimina el índice único antiguo por nombre de categoría (impediría que dos usuarios tengan su propia «Comida»). No borra documentos.
 2. `npx prisma db push`
 3. Regístrate en la app.
-4. `node scripts/claim-orphans.js --email tu@email.com --apply` → asigna los gastos antiguos a tu usuario, pasa los importes a céntimos y enlaza las categorías.
+4. `node scripts/claim-orphans.js --email tu@email.com --apply` → asigna los gastos y categorías antiguos a tu usuario, pasa los importes a céntimos y conserva los presupuestos. Los gastos con importe inválido se dejan intactos y se listan.
 
 ## Tests
 

@@ -50,6 +50,12 @@ export async function saveBankExpenses(user, parsed) {
   };
 }
 
+/** Estructura de un objeto (claves anidadas) sin ningún valor. */
+export function shapeOf(value, depth = 0) {
+  if (!value || typeof value !== 'object' || depth > 3) return typeof value;
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shapeOf(v, depth + 1)]));
+}
+
 export const bankRouter = Router();
 
 // Estado honesto: no se guarda ningún token, cada importación es puntual.
@@ -81,6 +87,11 @@ bankRouter.post('/import', async (req, res) => {
   const accessToken = await exchangeCode(code);
   const { accounts, transactions } = await fetchAllTransactions(accessToken);
   const { expenses, skipped } = parseTinkTransactions(transactions);
+  // Diagnóstico sin datos personales: solo nombres de campos, para detectar cambios en la API de Tink.
+  req.log.info(
+    { accounts, fetched: transactions.length, skipped, sampleKeys: shapeOf(transactions[0]) },
+    'Importación Tink',
+  );
   const result = await saveBankExpenses(req.user, expenses);
 
   res.json({ accounts, fetched: transactions.length, skipped, ...result });
