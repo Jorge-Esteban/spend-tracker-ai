@@ -18,6 +18,15 @@ export function centsToDecimal(cents) {
   return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
 }
 
+/** "12.345" -> 1235 céntimos (cualquier nº de decimales, redondeo half-away-from-zero). */
+export function decimalToCents(value) {
+  const s = String(value ?? '').trim();
+  const m = s.match(/^(-?)(\d+)(?:\.(\d+))?$/);
+  if (!m) throw new Error(`importe inválido: ${value}`);
+  const [, sign, int, frac = ''] = m;
+  return scaledToCents(`${sign}${int}${frac}`, frac.length);
+}
+
 /**
  * Convierte un importe escalado de Tink v2 ({ unscaledValue: "-1300", scale: "1" }) a céntimos.
  * value = unscaledValue * 10^(-scale). Se trabaja con BigInt para no perder precisión.

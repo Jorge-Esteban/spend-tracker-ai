@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { env, tinkEnabled } from '../../config/env.js';
+import { enableBankingEnabled, env, tinkEnabled } from '../../config/env.js';
 import { AppError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { categorizeExpenses } from '../ai/categorize.service.js';
 import { markInsightsStale } from '../ai/insights.service.js';
 import { consumeExpenseQuota, remainingExpenseQuota } from '../usage/quota.js';
 import { createState, verifyState } from './state.js';
-import { buildTinkLinkUrl, exchangeCode, fetchAllTransactions } from './tink.client.js';
+import * as eb from './enablebanking.client.js';
+import { parseEbTransactions } from './enablebanking.parser.js';
+import { buildTinkLinkUrl, exchangeCode, fetchAllTransactions, importSince } from './tink.client.js';
 import { parseTinkTransactions } from './tink.parser.js';
 
 const importSchema = z.object({
@@ -15,11 +17,23 @@ const importSchema = z.object({
   state: z.string().min(1).max(2048),
 });
 
-function requireTink() {
-  if (!tinkEnabled) throw new AppError(503, 'La conexión bancaria no está configurada', 'BANK_DISABLED');
+const PROVIDERS = { tink: () => tinkEnabled, enablebanking: () => enableBankingEnabled };
+
+function requireProvider(provider) {
+  if (!PROVIDERS[provider]?.()) {
+    throw new AppError(503, 'Esa conexión bancaria no está configurada en el servidor', 'BANK_DISABLED');
+  }
 }
 
-/** Guarda los movimientos parseados de Tink: dedup por externalId, cuota y categorización en lote. */
+const connectQuery = z.object({
+  provider: z.enum(['tink', 'enablebanking']).default('tink'),
+  aspsp: z.string().trim().min(1).max(120).optional(),
+});
+
+// La lista de bancos cambia poco: se cachea una hora en memoria.
+let aspspCache = { at: 0, list: [] };
+
+/** Guarda los movimientos parseados del banco: dedup por externalId, cuota y categorización en lote. */
 export async function saveBankExpenses(user, parsed) {
   const userId = user.id;
   const ids = parsed.map((e) => e.externalId);
@@ -80,22 +94,49 @@ bankRouter.get('/status', async (req, res) => {
   });
   const bankExpenses = await prisma.expense.count({ where: { userId: req.user.id, source: 'BANK' } });
   res.json({
-    enabled: tinkEnabled,
+    enabled: tinkEnabled || enableBankingEnabled,
+    providers: {
+      tink: { enabled: tinkEnabled, testMode: env.TINK_TEST_MODE },
+      enablebanking: { enabled: enableBankingEnabled, country: env.ENABLE_BANKING_COUNTRY },
+    },
     testMode: env.TINK_TEST_MODE,
     bankExpenses,
     lastImportAt: last?.createdAt ?? null,
   });
 });
 
-bankRouter.get('/connect-url', (req, res) => {
-  requireTink();
-  res.json({ url: buildTinkLinkUrl(createState(req.user.id)) });
+bankRouter.get('/aspsps', async (_req, res) => {
+  requireProvider('enablebanking');
+  if (Date.now() - aspspCache.at > 60 * 60 * 1000) aspspCache = { at: Date.now(), list: await eb.listAspsps() };
+  res.json({ aspsps: aspspCache.list });
+});
+
+bankRouter.get('/connect-url', async (req, res) => {
+  const { provider, aspsp } = connectQuery.parse(req.query);
+  requireProvider(provider);
+  if (provider === 'tink') {
+    return res.json({ url: buildTinkLinkUrl(createState(req.user.id, { provider })) });
+  }
+  if (!aspsp) throw new AppError(400, 'Elige tu banco', 'ASPSP_REQUIRED');
+  const state = createState(req.user.id, { provider, aspsp });
+  res.json({ url: await eb.startAuthorization({ aspsp, state }) });
 });
 
 bankRouter.post('/import', async (req, res) => {
-  requireTink();
   const { code, state } = importSchema.parse(req.body);
-  verifyState(state, req.user.id);
+  const { provider = 'tink', aspsp } = verifyState(state, req.user.id);
+  requireProvider(provider);
+
+  if (provider === 'enablebanking') {
+    const { accounts, transactions } = await eb.fetchAllTransactions(code, { since: importSince() });
+    const { expenses, skipped } = parseEbTransactions(transactions);
+    req.log.info(
+      { provider, aspsp, accounts, fetched: transactions.length, skipped, sampleKeys: shapeOf(transactions[0]?.tx) },
+      'Importación Enable Banking',
+    );
+    const result = await saveBankExpenses(req.user, expenses);
+    return res.json({ provider, aspsp, accounts, fetched: transactions.length, skipped, ...result });
+  }
 
   const accessToken = await exchangeCode(code);
   const { accounts, transactions } = await fetchAllTransactions(accessToken);
@@ -121,5 +162,5 @@ bankRouter.post('/import', async (req, res) => {
   }
   const result = await saveBankExpenses(req.user, expenses);
 
-  res.json({ accounts, fetched: transactions.length, skipped, ...result });
+  res.json({ provider, accounts, fetched: transactions.length, skipped, ...result });
 });

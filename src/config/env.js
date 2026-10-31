@@ -1,5 +1,8 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { z } from 'zod';
+
+// En los tests nunca se lee el .env real (claves, base de datos): todo viene de tests/setup.js.
+if (process.env.NODE_ENV !== 'test') dotenv.config({ quiet: true });
 
 // Lista separada por comas -> array sin vacíos.
 const csv = z
@@ -47,6 +50,15 @@ const EnvSchema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
 
+  // Enable Banking (bancos reales vía PSD2, p. ej. imagin). La clave RSA va en un fichero
+  // (local) o en la variable ENABLE_BANKING_PRIVATE_KEY (despliegue, con los saltos de línea como \n).
+  ENABLE_BANKING_APP_ID: z.string().optional(),
+  ENABLE_BANKING_KEY_PATH: z.string().optional(),
+  ENABLE_BANKING_PRIVATE_KEY: z.string().optional(),
+  // Debe estar en la lista de redirect URLs de la app (en producción exige https).
+  ENABLE_BANKING_REDIRECT_URI: z.url().optional(),
+  ENABLE_BANKING_COUNTRY: z.string().length(2).default('ES'),
+
   FREE_MONTHLY_EXPENSES: z.coerce.number().int().positive().default(50),
 });
 
@@ -64,3 +76,8 @@ export const env = parseEnv();
 export const isProd = env.NODE_ENV === 'production';
 export const tinkEnabled = Boolean(env.TINK_CLIENT_ID && env.TINK_CLIENT_SECRET && env.TINK_REDIRECT_URI);
 export const aiEnabled = Boolean(env.ANTHROPIC_API_KEY);
+export const enableBankingEnabled = Boolean(
+  env.ENABLE_BANKING_APP_ID &&
+    (env.ENABLE_BANKING_KEY_PATH || env.ENABLE_BANKING_PRIVATE_KEY) &&
+    env.ENABLE_BANKING_REDIRECT_URI,
+);
