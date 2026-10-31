@@ -14,3 +14,8 @@ coverage/
 .vscode/
 files.zip
 backups/
+
+# Claves privadas (Enable Banking u otras): nunca al repositorio
+*.pem
+*.key
+secrets/
