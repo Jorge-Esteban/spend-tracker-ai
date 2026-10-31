@@ -20,9 +20,16 @@ export default function BankCallback({ onDone }) {
     window.history.replaceState({}, '', window.location.pathname);
 
     if (!code || !state) {
-      setError(
-        params.get('error_description') || params.get('message') || 'El banco no devolvió autorización (¿cancelaste la conexión?).',
-      );
+      const description = params.get('error_description') || params.get('message');
+      setError(description || 'El banco no devolvió autorización (¿cancelaste la conexión?).');
+      // Se informa al servidor para que el fallo quede en el log (no lleva datos de la cuenta).
+      api
+        .post('/bank/callback-error', {
+          state: state || undefined,
+          error: params.get('error') || undefined,
+          description: description || undefined,
+        })
+        .catch(() => {});
       return;
     }
     api

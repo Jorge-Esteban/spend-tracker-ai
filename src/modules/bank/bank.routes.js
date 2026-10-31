@@ -122,6 +122,26 @@ bankRouter.get('/connect-url', async (req, res) => {
   res.json({ url: await eb.startAuthorization({ aspsp, state }) });
 });
 
+const callbackErrorSchema = z.object({
+  state: z.string().max(2048).optional(),
+  error: z.string().max(100).optional(),
+  description: z.string().max(500).optional(),
+});
+
+// El banco volvió sin código (error o cancelación): solo se registra para poder diagnosticarlo.
+bankRouter.post('/callback-error', (req, res) => {
+  const { state, error, description } = callbackErrorSchema.parse(req.body);
+  let provider;
+  let aspsp;
+  try {
+    ({ provider, aspsp } = state ? verifyState(state, req.user.id) : {});
+  } catch {
+    // Un state caducado o ajeno no impide registrar el error.
+  }
+  req.log.warn({ provider, aspsp, error, description }, 'El banco volvió sin autorización');
+  res.status(204).end();
+});
+
 bankRouter.post('/import', async (req, res) => {
   const { code, state } = importSchema.parse(req.body);
   const { provider = 'tink', aspsp } = verifyState(state, req.user.id);

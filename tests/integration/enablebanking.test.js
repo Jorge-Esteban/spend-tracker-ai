@@ -81,6 +81,17 @@ describe('Enable Banking', () => {
     expect(again.body).toMatchObject({ imported: 0, duplicates: 2 });
   });
 
+  it('registra la vuelta sin autorización y valida el cuerpo', async () => {
+    const u = await registerUser();
+    const state = await connectImagin(u.agent);
+    await u.agent
+      .post('/api/bank/callback-error')
+      .send({ state, error: 'access_denied', description: 'El usuario canceló' })
+      .expect(204);
+    await u.agent.post('/api/bank/callback-error').send({ description: 'x'.repeat(600) }).expect(400);
+    expect(eb.fetchAllTransactions).not.toHaveBeenCalled();
+  });
+
   it('Tink sigue siendo el proveedor por defecto (Demo Bank)', async () => {
     const u = await registerUser();
     const { body } = await u.agent.get('/api/bank/connect-url').expect(200);
