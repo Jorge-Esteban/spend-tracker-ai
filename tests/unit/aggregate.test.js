@@ -71,11 +71,11 @@ describe('buildStats', () => {
       categories: cats,
       expenses: [e('food', 12000, '2026-03-10'), e('fun', 3000, '2026-03-11'), e('food', 10000, '2026-02-10')],
     });
-    expect(stats.totals).toEqual({ totalCents: 15000, count: 2, avgCents: 7500 });
+    expect(stats.totals).toEqual({ totalCents: 15000, count: 2, avgCents: 7500, incomeCents: 0, incomeCount: 0, balanceCents: -15000 });
     expect(stats.previous).toMatchObject({ month: '2026-02', totalCents: 10000, deltaPct: 50 });
     expect(stats.budgets).toEqual({ warning: 0, exceeded: 1 });
     expect(stats.trend).toHaveLength(12);
-    expect(stats.trend.at(-1)).toEqual({ month: '2026-03', totalCents: 15000 });
+    expect(stats.trend.at(-1)).toEqual({ month: '2026-03', totalCents: 15000, incomeCents: 0 });
   });
 
   it('pctChange es null sin mes anterior', () => {

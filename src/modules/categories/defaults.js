@@ -1,5 +1,6 @@
-// Categorías que se crean al registrarse. "Otros" es la de reserva y no se puede borrar.
-export const FALLBACK_CATEGORY_NAME = 'Otros';
+// Categorías que se crean al registrarse. Cada tipo tiene su categoría de reserva,
+// que no se puede borrar y recibe lo que no encaja en otra.
+export const FALLBACK_NAMES = { EXPENSE: 'Otros', INCOME: 'Otros ingresos' };
 
 export const DEFAULT_CATEGORIES = [
   { name: 'Comida', color: '#f97316', icon: '🍽️' },
@@ -9,5 +10,8 @@ export const DEFAULT_CATEGORIES = [
   { name: 'Compras', color: '#ec4899', icon: '🛍️' },
   { name: 'Servicios', color: '#eab308', icon: '💡' },
   { name: 'Vivienda', color: '#6366f1', icon: '🏠' },
-  { name: FALLBACK_CATEGORY_NAME, color: '#94a3b8', icon: '🏷️', isFallback: true },
+  { name: FALLBACK_NAMES.EXPENSE, color: '#94a3b8', icon: '🏷️', isFallback: true },
+  { name: 'Nómina', color: '#16a34a', icon: '💼', kind: 'INCOME' },
+  { name: 'Reembolsos', color: '#0d9488', icon: '↩️', kind: 'INCOME' },
+  { name: FALLBACK_NAMES.INCOME, color: '#65a30d', icon: '💰', kind: 'INCOME', isFallback: true },
 ];

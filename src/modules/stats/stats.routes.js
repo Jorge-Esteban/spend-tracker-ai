@@ -24,7 +24,7 @@ statsRouter.get('/', async (req, res) => {
   const [expenses, categories, usage] = await Promise.all([
     prisma.expense.findMany({
       where: { userId, date: { gte: from, lt: to } },
-      select: { amountCents: true, categoryId: true, date: true },
+      select: { amountCents: true, categoryId: true, date: true, kind: true },
     }),
     prisma.category.findMany({ where: { userId } }),
     getUsage(req.user),

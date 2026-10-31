@@ -112,8 +112,8 @@ describe('gastos', () => {
 
     const csv = await agent.get('/api/expenses/export.csv?month=2026-02').expect(200);
     expect(csv.headers['content-type']).toMatch(/text\/csv/);
-    expect(csv.headers['content-disposition']).toContain('gastos-2026-02.csv');
-    expect(csv.text).toContain('2026-02-01;Libro;;Ocio;9,99;EUR;manual');
+    expect(csv.headers['content-disposition']).toContain('movimientos-2026-02.csv');
+    expect(csv.text).toContain('2026-02-01;gasto;Libro;;Ocio;9,99;EUR;manual');
     expect(csv.text).not.toContain('Borrar');
     expect(await prisma.expense.count({ where: { id: a.body.expense.id } })).toBe(1);
   });

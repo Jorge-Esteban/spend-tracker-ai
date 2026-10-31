@@ -18,8 +18,10 @@ describe('auth', () => {
     expect(res.body.user.passwordHash).toBeUndefined();
 
     const { categories } = await registerUser();
-    expect(Object.keys(categories)).toHaveLength(8);
-    expect(categories.Otros.isFallback).toBe(true);
+    expect(Object.keys(categories)).toHaveLength(11);
+    expect(categories.Otros).toMatchObject({ isFallback: true, kind: 'EXPENSE' });
+    expect(categories['Otros ingresos']).toMatchObject({ isFallback: true, kind: 'INCOME' });
+    expect(categories['Nómina'].kind).toBe('INCOME');
   });
 
   it('email duplicado -> 409', async () => {

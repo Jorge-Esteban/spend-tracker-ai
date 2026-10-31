@@ -16,7 +16,7 @@ const toData = ({ monthlyBudget, ...rest }) => ({
 categoriesRouter.get('/', async (req, res) => {
   const categories = await prisma.category.findMany({
     where: { userId: req.user.id },
-    orderBy: [{ isFallback: 'asc' }, { name: 'asc' }],
+    orderBy: [{ kind: 'asc' }, { isFallback: 'asc' }, { name: 'asc' }],
   });
   res.json({ categories });
 });
@@ -34,19 +34,22 @@ categoriesRouter.patch('/:id', async (req, res) => {
   if (current.isFallback && body.name && body.name !== current.name) {
     throw badRequest('La categoría de reserva no se puede renombrar', 'FALLBACK_LOCKED');
   }
+  if (current.kind === 'INCOME' && body.monthlyBudget != null) {
+    throw badRequest('Los presupuestos son solo para categorías de gasto', 'BUDGET_EXPENSE_ONLY');
+  }
   const category = await prisma.category.update({ where: { id }, data: toData(body) });
   await markInsightsStale(req.user.id);
   res.json({ category });
 });
 
-// Borrar una categoría reasigna sus gastos a "Otros" y elimina sus reglas de comercio.
+// Borrar una categoría reasigna sus movimientos a la reserva de su tipo y elimina sus reglas de comercio.
 categoriesRouter.delete('/:id', async (req, res) => {
   const { id } = idParams.parse(req.params);
   const userId = req.user.id;
   const category = await assertOwnCategory(userId, id);
   if (category.isFallback) throw badRequest('La categoría de reserva no se puede borrar', 'FALLBACK_LOCKED');
 
-  const fallback = await getFallbackCategory(userId);
+  const fallback = await getFallbackCategory(userId, category.kind);
   const [moved] = await prisma.$transaction([
     prisma.expense.updateMany({
       where: { userId, categoryId: id },

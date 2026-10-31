@@ -57,14 +57,14 @@ describe('estadísticas y presupuestos', () => {
     await add(100, `${prev}-15`, categories.Comida);
 
     const { body } = await agent.get(`/api/stats?month=${month}`).expect(200);
-    expect(body.totals).toEqual({ totalCents: 14500, count: 2, avgCents: 7250 });
+    expect(body.totals).toEqual({ totalCents: 14500, count: 2, avgCents: 7250, incomeCents: 0, incomeCount: 0, balanceCents: -14500 });
     expect(body.previous).toMatchObject({ month: prev, totalCents: 10000, deltaPct: 45 });
     const byName = Object.fromEntries(body.byCategory.map((r) => [r.name, r]));
     expect(byName.Comida).toMatchObject({ budgetStatus: 'warning', budgetUsedPct: 85 });
     expect(byName.Ocio).toMatchObject({ budgetStatus: 'exceeded', budgetUsedPct: 120 });
     expect(body.budgets).toEqual({ warning: 1, exceeded: 1 });
     expect(body.trend).toHaveLength(12);
-    expect(body.trend.at(-2)).toEqual({ month: prev, totalCents: 10000 });
+    expect(body.trend.at(-2)).toEqual({ month: prev, totalCents: 10000, incomeCents: 0 });
     expect(body.usage).toMatchObject({ plan: 'FREE', expenses: 3, limit: 5, remaining: 2 });
   });
 

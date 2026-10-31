@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma.js';
 import { idParams } from '../../middleware/validate.js';
 import { categorizeExpenses, learnMerchantRule } from '../ai/categorize.service.js';
 import { markInsightsStale } from '../ai/insights.service.js';
-import { assertOwnCategory } from '../categories/categories.service.js';
+import { assertOwnCategory, getFallbackCategory } from '../categories/categories.service.js';
 import { monthQuery } from '../stats/stats.routes.js';
 import { consumeExpenseQuota } from '../usage/quota.js';
 import { toCsv } from './csv.js';
@@ -22,13 +22,14 @@ async function findOwnExpense(userId, id) {
 export const expensesRouter = Router();
 
 expensesRouter.get('/', async (req, res) => {
-  const { month, categoryId, q, page, pageSize } = listExpensesQuery.parse(req.query);
+  const { month, categoryId, kind, q, page, pageSize } = listExpensesQuery.parse(req.query);
   const where = { userId: req.user.id };
   if (month) {
     const { start, end } = monthRange(month);
     where.date = { gte: start, lt: end };
   }
   if (categoryId) where.categoryId = categoryId;
+  if (kind) where.kind = kind;
   if (q) {
     where.OR = [
       { description: { contains: q, mode: 'insensitive' } },
@@ -60,7 +61,7 @@ expensesRouter.get('/export.csv', async (req, res) => {
   });
   res
     .type('text/csv; charset=utf-8')
-    .attachment(`gastos-${month}.csv`)
+    .attachment(`movimientos-${month}.csv`)
     .send(toCsv(expenses));
 });
 
@@ -77,7 +78,7 @@ expensesRouter.post('/', async (req, res) => {
 
   let category;
   if (categoryId) {
-    await assertOwnCategory(userId, categoryId);
+    await assertOwnCategory(userId, categoryId, body.kind);
     category = { categoryId, categorizedBy: 'USER' };
   } else {
     [category] = await categorizeExpenses(userId, [{ ...body, amountCents: amount }]);
@@ -100,12 +101,18 @@ expensesRouter.patch('/:id', async (req, res) => {
 
   const data = { ...body };
   if (amount !== undefined) data.amountCents = amount;
+  const kind = body.kind ?? current.kind;
   if (categoryId && categoryId !== current.categoryId) {
-    await assertOwnCategory(userId, categoryId);
+    await assertOwnCategory(userId, categoryId, kind);
     data.categoryId = categoryId;
     data.categorizedBy = 'USER';
     // Corrección del usuario -> regla para el futuro.
     await learnMerchantRule(userId, { ...current, ...body }, categoryId);
+  } else if (kind !== current.kind) {
+    // Cambia de gasto a ingreso (o al revés) sin nueva categoría: va a la reserva del nuevo tipo.
+    const target = categoryId ? await assertOwnCategory(userId, categoryId, kind) : await getFallbackCategory(userId, kind);
+    data.categoryId = target.id;
+    data.categorizedBy = categoryId ? 'USER' : 'FALLBACK';
   }
 
   const expense = await prisma.expense.update({ where: { id }, data, include: withCategory });

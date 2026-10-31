@@ -15,6 +15,12 @@ enum Plan {
   PRO
 }
 
+// Un movimiento es un gasto o un ingreso; las categorías también tienen tipo.
+enum EntryKind {
+  EXPENSE
+  INCOME
+}
+
 enum ExpenseSource {
   MANUAL
   BANK
@@ -50,17 +56,18 @@ model User {
 }
 
 model Category {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId             String   @db.ObjectId
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String    @db.ObjectId
   name               String
-  color              String   @default("#94a3b8")
-  icon               String   @default("🏷️")
-  // Presupuesto mensual en céntimos; null = sin presupuesto.
+  color              String    @default("#94a3b8")
+  icon               String    @default("🏷️")
+  kind               EntryKind @default(EXPENSE)
+  // Presupuesto mensual en céntimos (solo categorías de gasto); null = sin presupuesto.
   monthlyBudgetCents Int?
-  // La categoría "Otros": no se puede borrar y recibe los gastos huérfanos.
-  isFallback         Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  // Categoría de reserva de cada tipo («Otros» / «Otros ingresos»): no se borra y recibe lo huérfano.
+  isFallback         Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   expenses      Expense[]
@@ -70,11 +77,13 @@ model Category {
   @@map("categories")
 }
 
+// Movimiento (gasto o ingreso). El nombre del modelo se mantiene por compatibilidad con la colección.
 model Expense {
   id            String        @id @default(auto()) @map("_id") @db.ObjectId
   userId        String        @db.ObjectId
   categoryId    String        @db.ObjectId
-  // Dinero siempre en céntimos enteros: nada de Float.
+  kind          EntryKind     @default(EXPENSE)
+  // Dinero siempre en céntimos enteros y positivos; el signo lo da el campo kind.
   amountCents   Int
   currency      String        @default("EUR")
   description   String
@@ -134,14 +143,14 @@ model AiInsight {
 
 // Contadores de cuota por usuario y periodo (YYYY-MM).
 model UsageCounter {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String   @db.ObjectId
-  period      String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  period     String
   // Transacciones creadas (manuales + importadas) en el periodo.
-  expenses    Int      @default(0)
+  expenses   Int      @default(0)
   // Llamadas de IA de insights en el periodo.
-  aiInsights  Int      @default(0)
-  updatedAt   DateTime @updatedAt
+  aiInsights Int      @default(0)
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

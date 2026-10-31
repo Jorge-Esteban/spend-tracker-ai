@@ -7,54 +7,68 @@ import { categorizeBatch } from './claude.js';
 import { merchantKeyFor } from './merchant.js';
 
 const AI_BATCH_SIZE = 100;
+const KINDS = ['EXPENSE', 'INCOME'];
 
 /**
- * Asigna categoría a una lista de gastos sin categoría.
- * Orden: regla de comercio aprendida -> Claude en lotes -> "Otros".
+ * Asigna categoría a una lista de movimientos sin categoría.
+ * Orden: regla de comercio aprendida -> Claude en lotes -> reserva del tipo.
+ * Un gasto solo recibe categorías de gasto y un ingreso, de ingreso.
  * @param {string} userId
- * @param {{ description: string, merchant?: string|null, amountCents: number }[]} items
+ * @param {{ kind?: 'EXPENSE'|'INCOME', description: string, merchant?: string|null, amountCents: number }[]} items
  * @returns {Promise<{ categoryId: string, categorizedBy: 'RULE'|'AI'|'FALLBACK' }[]>}
  */
 export async function categorizeExpenses(userId, items) {
   if (items.length === 0) return [];
 
-  const fallback = await getFallbackCategory(userId);
+  const kindOf = (item) => item.kind ?? 'EXPENSE';
+  const fallbacks = {};
+  for (const kind of new Set(items.map(kindOf))) fallbacks[kind] = await getFallbackCategory(userId, kind);
+
   const [categories, rules] = await Promise.all([
-    prisma.category.findMany({ where: { userId }, select: { id: true, name: true, isFallback: true } }),
+    prisma.category.findMany({ where: { userId }, select: { id: true, name: true, kind: true, isFallback: true } }),
     prisma.merchantRule.findMany({ where: { userId }, select: { merchantKey: true, categoryId: true } }),
   ]);
+  const kindById = new Map(categories.map((c) => [c.id, c.kind]));
   const ruleByKey = new Map(rules.map((r) => [r.merchantKey, r.categoryId]));
 
   const result = items.map((item) => {
     const ruleCategory = ruleByKey.get(merchantKeyFor(item));
-    return ruleCategory
+    return ruleCategory && kindById.get(ruleCategory) === kindOf(item)
       ? { categoryId: ruleCategory, categorizedBy: 'RULE' }
-      : { categoryId: fallback.id, categorizedBy: 'FALLBACK' };
+      : { categoryId: fallbacks[kindOf(item)].id, categorizedBy: 'FALLBACK' };
   });
+  if (!aiEnabled) return result;
 
-  const pending = result.map((r, i) => (r.categorizedBy === 'FALLBACK' ? i : -1)).filter((i) => i >= 0);
-  if (!aiEnabled || pending.length === 0) return result;
+  for (const kind of KINDS) {
+    const pending = items.flatMap((item, i) =>
+      kindOf(item) === kind && result[i].categorizedBy === 'FALLBACK' ? [i] : [],
+    );
+    if (pending.length === 0) continue;
 
-  // "Otros" va al final para que el prompt lo use como comodín.
-  const names = [...categories.filter((c) => !c.isFallback).map((c) => c.name), fallback.name];
-  const idByName = new Map(categories.map((c) => [c.name, c.id]));
+    const fallback = fallbacks[kind];
+    const own = categories.filter((c) => c.kind === kind && !c.isFallback);
+    if (own.length === 0) continue; // solo existe la reserva: no hay nada que decidir
+    // La reserva va al final para que el prompt la use como comodín.
+    const names = [...own.map((c) => c.name), fallback.name];
+    const idByName = new Map(own.map((c) => [c.name, c.id]));
 
-  for (let start = 0; start < pending.length; start += AI_BATCH_SIZE) {
-    const chunk = pending.slice(start, start + AI_BATCH_SIZE);
-    const payload = chunk.map((idx) => ({
-      i: idx,
-      text: [items[idx].merchant, items[idx].description].filter(Boolean).join(' · ').slice(0, 160),
-      amount: centsToDecimal(items[idx].amountCents),
-    }));
-    try {
-      const answers = await categorizeBatch(payload, names);
-      for (const idx of chunk) {
-        const categoryId = idByName.get(answers.get(idx));
-        if (categoryId && categoryId !== fallback.id) result[idx] = { categoryId, categorizedBy: 'AI' };
+    for (let start = 0; start < pending.length; start += AI_BATCH_SIZE) {
+      const chunk = pending.slice(start, start + AI_BATCH_SIZE);
+      const payload = chunk.map((idx) => ({
+        i: idx,
+        text: [items[idx].merchant, items[idx].description].filter(Boolean).join(' · ').slice(0, 160),
+        amount: centsToDecimal(items[idx].amountCents),
+      }));
+      try {
+        const answers = await categorizeBatch(payload, names, kind);
+        for (const idx of chunk) {
+          const categoryId = idByName.get(answers.get(idx));
+          if (categoryId) result[idx] = { categoryId, categorizedBy: 'AI' };
+        }
+      } catch (err) {
+        // La categorización nunca bloquea el alta: el movimiento se queda en la reserva.
+        logger.warn({ err: err.message, count: chunk.length, kind }, 'Categorización IA fallida; se usa la reserva');
       }
-    } catch (err) {
-      // La categorización nunca bloquea el alta del gasto: se queda en "Otros".
-      logger.warn({ err: err.message, count: chunk.length }, 'Categorización IA fallida; se usa Otros');
     }
   }
   return result;

@@ -19,6 +19,7 @@ describe('parseTinkTransaction', () => {
     expect(parseTinkTransaction(tx())).toEqual({
       expense: {
         externalId: 'd8f37f7d19c240abb4ef5d5dbebae4ef',
+        kind: 'EXPENSE',
         amountCents: 1350,
         currency: 'EUR',
         description: 'Mercadona',
@@ -28,8 +29,10 @@ describe('parseTinkTransaction', () => {
     });
   });
 
-  it('ignora ingresos y movimientos pendientes', () => {
-    expect(parseTinkTransaction(tx({ amount: { value: { unscaledValue: '5000', scale: '2' } } }))).toEqual({ skip: 'income' });
+  it('un importe positivo es un ingreso; los pendientes y los importes cero se ignoran', () => {
+    const { expense } = parseTinkTransaction(tx({ amount: { value: { unscaledValue: '250000', scale: '2' }, currencyCode: 'EUR' } }));
+    expect(expense).toMatchObject({ kind: 'INCOME', amountCents: 250000 });
+    expect(parseTinkTransaction(tx({ amount: { value: { unscaledValue: '0', scale: '2' } } }))).toEqual({ skip: 'invalid' });
     expect(parseTinkTransaction(tx({ status: 'PENDING' }))).toEqual({ skip: 'pending' });
   });
 
@@ -68,8 +71,8 @@ describe('parseTinkTransactions', () => {
       tx({ id: 'b', status: 'PENDING' }),
       tx({ id: 'c', amount: { value: { unscaledValue: '1', scale: '0' } } }),
     ]);
-    expect(expenses).toHaveLength(1);
-    expect(skipped).toEqual({ income: 1, pending: 1, invalid: 0, duplicateInBatch: 1 });
+    expect(expenses.map((e) => e.kind)).toEqual(['EXPENSE', 'INCOME']);
+    expect(skipped).toEqual({ pending: 1, invalid: 0, duplicateInBatch: 1 });
   });
 });
 

@@ -1,8 +1,9 @@
-// Exportación CSV pensada para abrirse en Excel en español:
+// Exportación CSV de movimientos (el importe va siempre en positivo; el tipo dice si es gasto o ingreso),
+// pensada para abrirse en Excel en español:
 // separador ";", coma decimal y BOM UTF-8 para que salgan bien las tildes.
 
-export const CSV_HEADERS = ['fecha', 'descripcion', 'comercio', 'categoria', 'importe', 'moneda', 'origen'];
-const BOM = '﻿';
+export const CSV_HEADERS = ['fecha', 'tipo', 'descripcion', 'comercio', 'categoria', 'importe', 'moneda', 'origen'];
+const BOM = '\uFEFF';
 
 /** Escapa un campo y neutraliza inyección de fórmulas (=, +, -, @, tab, CR). */
 export function csvField(value) {
@@ -27,6 +28,7 @@ export function toCsv(expenses) {
     lines.push(
       [
         new Date(e.date).toISOString().slice(0, 10),
+        e.kind === 'INCOME' ? 'ingreso' : 'gasto',
         e.description,
         e.merchant ?? '',
         e.category?.name ?? '',

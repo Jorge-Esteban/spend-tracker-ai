@@ -21,6 +21,7 @@ describe('toCsv', () => {
         date: new Date('2026-03-05T00:00:00Z'),
         description: 'Compra; semanal',
         merchant: 'Mercadona',
+        kind: 'EXPENSE',
         amountCents: 4599,
         currency: 'EUR',
         source: 'BANK',
@@ -30,6 +31,7 @@ describe('toCsv', () => {
         date: new Date('2026-03-06T00:00:00Z'),
         description: 'Café',
         merchant: null,
+        kind: 'INCOME',
         amountCents: 5,
         currency: 'EUR',
         source: 'MANUAL',
@@ -37,8 +39,8 @@ describe('toCsv', () => {
     ]);
     expect(csv.startsWith('﻿')).toBe(true);
     const lines = csv.slice(1).trimEnd().split('\r\n');
-    expect(lines[0]).toBe('fecha;descripcion;comercio;categoria;importe;moneda;origen');
-    expect(lines[1]).toBe('2026-03-05;"Compra; semanal";Mercadona;Comida;45,99;EUR;banco');
-    expect(lines[2]).toBe('2026-03-06;Café;;;0,05;EUR;manual');
+    expect(lines[0]).toBe('fecha;tipo;descripcion;comercio;categoria;importe;moneda;origen');
+    expect(lines[1]).toBe('2026-03-05;gasto;"Compra; semanal";Mercadona;Comida;45,99;EUR;banco');
+    expect(lines[2]).toBe('2026-03-06;ingreso;Café;;;0,05;EUR;manual');
   });
 });

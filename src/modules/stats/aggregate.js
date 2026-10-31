@@ -70,14 +70,34 @@ export function pctChange(current, previous) {
   return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
-/** Construye la respuesta de /api/stats a partir de 12 meses de gastos. */
+// Los datos antiguos o de tests pueden no traer kind: cuentan como gasto.
+export const kindOf = (row) => row.kind ?? 'EXPENSE';
+export const onlyKind = (rows, kind) => rows.filter((r) => kindOf(r) === kind);
+
+/** Resumen de un mes: gastos (totalCents/count/avgCents), ingresos y balance. */
+export function monthSummary(entries) {
+  const spent = summarize(onlyKind(entries, 'EXPENSE'));
+  const earned = summarize(onlyKind(entries, 'INCOME'));
+  return {
+    ...spent,
+    incomeCents: earned.totalCents,
+    incomeCount: earned.count,
+    balanceCents: earned.totalCents - spent.totalCents,
+  };
+}
+
+/** Construye la respuesta de /api/stats a partir de 12 meses de movimientos. */
 export function buildStats({ month, expenses, categories, trendMonths = 12 }) {
   const prevMonth = shiftMonth(month, -1);
   const current = expenses.filter((e) => monthKey(e.date) === month);
   const previous = expenses.filter((e) => monthKey(e.date) === prevMonth);
-  const totals = summarize(current);
-  const prevTotals = summarize(previous);
-  const byCategory = aggregateByCategory(current, categories);
+  const totals = monthSummary(current);
+  const prevTotals = monthSummary(previous);
+  // Presupuestos y reparto solo para gastos; los ingresos van en su propio bloque.
+  const byCategory = aggregateByCategory(onlyKind(current, 'EXPENSE'), onlyKind(categories, 'EXPENSE'));
+  const incomeByCategory = aggregateByCategory(onlyKind(current, 'INCOME'), onlyKind(categories, 'INCOME'));
+  const months = lastMonths(month, trendMonths);
+  const incomeTrend = monthlyTrend(onlyKind(expenses, 'INCOME'), months);
 
   return {
     month,
@@ -88,11 +108,15 @@ export function buildStats({ month, expenses, categories, trendMonths = 12 }) {
       deltaPct: pctChange(totals.totalCents, prevTotals.totalCents),
     },
     byCategory,
+    incomeByCategory,
     budgets: {
       warning: byCategory.filter((r) => r.budgetStatus === 'warning').length,
       exceeded: byCategory.filter((r) => r.budgetStatus === 'exceeded').length,
     },
-    trend: monthlyTrend(expenses, lastMonths(month, trendMonths)),
+    trend: monthlyTrend(onlyKind(expenses, 'EXPENSE'), months).map((t, i) => ({
+      ...t,
+      incomeCents: incomeTrend[i].totalCents,
+    })),
   };
 }
 

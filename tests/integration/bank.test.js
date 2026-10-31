@@ -52,7 +52,7 @@ describe('importación bancaria (Tink)', () => {
     expect(tink.exchangeCode).not.toHaveBeenCalled();
   });
 
-  it('importa solo cargos, categoriza en un único lote y deduplica por externalId', async () => {
+  it('importa cargos e ingresos, categoriza en un lote por tipo y deduplica por externalId', async () => {
     const u = await registerUser();
     tink.fetchAllTransactions.mockResolvedValue({
       accounts: 1,
@@ -68,27 +68,34 @@ describe('importación bancaria (Tink)', () => {
     expect(first.body).toMatchObject({
       accounts: 1,
       fetched: 4,
-      imported: 2,
+      imported: 3,
+      importedExpenses: 2,
+      importedIncome: 1,
       duplicates: 0,
       skippedByQuota: 0,
-      skipped: { income: 1, pending: 1 },
+      skipped: { pending: 1 },
     });
-    expect(categorizeBatch).toHaveBeenCalledTimes(1);
-    expect(categorizeBatch.mock.calls[0][0]).toHaveLength(2);
+    // Un lote para los gastos y otro para los ingresos.
+    expect(categorizeBatch).toHaveBeenCalledTimes(2);
+    expect(categorizeBatch.mock.calls.map((c) => [c[0].length, c[2]])).toEqual([
+      [2, 'EXPENSE'],
+      [1, 'INCOME'],
+    ]);
 
     const saved = await prisma.expense.findMany({ where: { userId: u.user.id }, orderBy: { amountCents: 'desc' } });
-    expect(saved.map((e) => [e.externalId, e.amountCents, e.source, e.categorizedBy])).toEqual([
-      ['t1', 1250, 'BANK', 'AI'],
-      ['t2', 300, 'BANK', 'AI'],
+    expect(saved.map((e) => [e.externalId, e.kind, e.amountCents, e.source, e.categorizedBy])).toEqual([
+      ['t3', 'INCOME', 250000, 'BANK', 'FALLBACK'], // el mock no conoce categorías de ingreso
+      ['t1', 'EXPENSE', 1250, 'BANK', 'AI'],
+      ['t2', 'EXPENSE', 300, 'BANK', 'AI'],
     ]);
 
     // Segunda importación con los mismos movimientos: nada nuevo.
     const again = await importWith(u.agent, 'c2', 200);
-    expect(again.body).toMatchObject({ imported: 0, duplicates: 2 });
-    expect(await prisma.expense.count({ where: { userId: u.user.id } })).toBe(2);
+    expect(again.body).toMatchObject({ imported: 0, duplicates: 3 });
+    expect(await prisma.expense.count({ where: { userId: u.user.id } })).toBe(3);
 
     const status = await u.agent.get('/api/bank/status').expect(200);
-    expect(status.body).toMatchObject({ enabled: true, bankExpenses: 2 });
+    expect(status.body).toMatchObject({ enabled: true, bankExpenses: 3 });
     expect(status.body.lastImportAt).toBeTruthy();
   });
 

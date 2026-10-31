@@ -12,8 +12,8 @@ import { scaledToCents } from '../../lib/money.js';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Convierte una transacción v2 en un gasto, o devuelve { skip: motivo }.
- * Solo se importan cargos (importe negativo) ya contabilizados.
+ * Convierte una transacción v2 en un movimiento, o devuelve { skip: motivo }.
+ * Importe negativo = gasto, positivo = ingreso. Los pendientes se ignoran (Tink puede cambiarlos).
  */
 export function parseTinkTransaction(tx) {
   if (!tx || typeof tx !== 'object' || !tx.id) return { skip: 'invalid' };
@@ -28,7 +28,7 @@ export function parseTinkTransaction(tx) {
   } catch {
     return { skip: 'invalid' };
   }
-  if (cents >= 0) return { skip: 'income' };
+  if (cents === 0) return { skip: 'invalid' };
 
   const rawDate = tx.dates?.booked ?? tx.dates?.value;
   if (!rawDate || !DATE_RE.test(rawDate)) return { skip: 'invalid' };
@@ -40,7 +40,8 @@ export function parseTinkTransaction(tx) {
   return {
     expense: {
       externalId: String(tx.id),
-      amountCents: -cents,
+      kind: cents < 0 ? 'EXPENSE' : 'INCOME',
+      amountCents: Math.abs(cents),
       currency: tx.amount.currencyCode || 'EUR',
       description: description.slice(0, 200),
       merchant: merchant?.slice(0, 120) ?? null,
@@ -56,7 +57,7 @@ export function parseTinkTransaction(tx) {
 export function parseTinkTransactions(transactions) {
   const seen = new Set();
   const expenses = [];
-  const skipped = { income: 0, pending: 0, invalid: 0, duplicateInBatch: 0 };
+  const skipped = { pending: 0, invalid: 0, duplicateInBatch: 0 };
   for (const tx of transactions ?? []) {
     const { expense, skip } = parseTinkTransaction(tx);
     if (skip) {

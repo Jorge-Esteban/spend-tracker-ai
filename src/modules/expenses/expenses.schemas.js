@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isMonthKey } from '../../lib/dates.js';
 import { toCents } from '../../lib/money.js';
 import { objectId } from '../../middleware/validate.js';
+import { kindSchema } from '../categories/categories.schemas.js';
 
 const MAX_CENTS = 100_000_000; // 1 millón de euros
 
@@ -22,7 +23,7 @@ export const dateSchema = z
   .union([z.iso.date(), z.iso.datetime({ offset: true })])
   .transform((v) => new Date(v.length === 10 ? `${v}T00:00:00.000Z` : v));
 
-export const createExpenseSchema = z.object({
+const entryFields = {
   amount: amountSchema,
   description: z.string().trim().min(1, 'La descripción es obligatoria').max(200),
   merchant: z.string().trim().max(120).optional().nullable(),
@@ -31,18 +32,23 @@ export const createExpenseSchema = z.object({
     .string()
     .regex(/^[A-Z]{3}$/)
     .default('EUR'),
-  // Sin categoría -> se categoriza automáticamente (regla -> IA -> Otros).
+  // Sin categoría -> se categoriza automáticamente (regla -> IA -> reserva del tipo).
   categoryId: objectId.optional(),
-});
+};
 
-export const updateExpenseSchema = createExpenseSchema
-  .omit({ currency: true })
+// Movimiento: gasto (por defecto) o ingreso. El importe siempre es positivo.
+export const createExpenseSchema = z.object({ ...entryFields, kind: kindSchema.default('EXPENSE') });
+
+const { currency: _currency, ...updatable } = entryFields;
+export const updateExpenseSchema = z
+  .object({ ...updatable, kind: kindSchema })
   .partial()
   .refine((v) => Object.keys(v).length > 0, { message: 'Nada que actualizar' });
 
 export const listExpensesQuery = z.object({
   month: z.string().refine(isMonthKey, 'Formato de mes YYYY-MM').optional(),
   categoryId: objectId.optional(),
+  kind: kindSchema.optional(),
   q: z.string().trim().max(80).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),

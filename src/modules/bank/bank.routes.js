@@ -19,7 +19,7 @@ function requireTink() {
   if (!tinkEnabled) throw new AppError(503, 'La conexión bancaria no está configurada', 'BANK_DISABLED');
 }
 
-/** Guarda los gastos parseados de Tink: dedup por externalId, cuota y categorización en lote. */
+/** Guarda los movimientos parseados de Tink: dedup por externalId, cuota y categorización en lote. */
 export async function saveBankExpenses(user, parsed) {
   const userId = user.id;
   const ids = parsed.map((e) => e.externalId);
@@ -45,6 +45,8 @@ export async function saveBankExpenses(user, parsed) {
 
   return {
     imported: accepted.length,
+    importedExpenses: accepted.filter((e) => e.kind === 'EXPENSE').length,
+    importedIncome: accepted.filter((e) => e.kind === 'INCOME').length,
     duplicates: known.size,
     skippedByQuota: fresh.length - accepted.length,
   };

@@ -4,7 +4,7 @@ import { currentMonthKey, lastMonths, monthKey, monthRange, shiftMonth } from '.
 import { badRequest } from '../../lib/errors.js';
 import { centsToDecimal, toCents } from '../../lib/money.js';
 import { prisma } from '../../lib/prisma.js';
-import { aggregateByCategory, monthlyTrend, topMerchants } from '../stats/aggregate.js';
+import { aggregateByCategory, monthlyTrend, onlyKind, topMerchants } from '../stats/aggregate.js';
 import { planLimits, trackInsightCall } from '../usage/quota.js';
 import { generateInsights } from './claude.js';
 
@@ -16,23 +16,34 @@ const euros = (cents) => Number(centsToDecimal(cents));
  * Solo cifras agregadas: ni ids, ni emails, ni movimientos individuales.
  */
 export function buildInsightInput({ month, expenses, categories }) {
-  const current = expenses.filter((e) => monthKey(e.date) === month);
+  const spending = onlyKind(expenses, 'EXPENSE');
+  const income = onlyKind(expenses, 'INCOME');
+  const inMonth = (rows) => rows.filter((e) => monthKey(e.date) === month);
   const last3 = new Set(lastMonths(month, 3));
+  const months = lastMonths(month, 6);
+  const incomeTrend = monthlyTrend(income, months);
   return {
     currency: 'EUR',
     month,
-    monthlyTotals: monthlyTrend(expenses, lastMonths(month, 6)).map((m) => ({
+    // Por mes: gastos, ingresos y balance (ingresos - gastos).
+    monthlyTotals: monthlyTrend(spending, months).map((m, i) => ({
       month: m.month,
-      total: euros(m.totalCents),
+      spent: euros(m.totalCents),
+      income: euros(incomeTrend[i].totalCents),
+      balance: euros(incomeTrend[i].totalCents - m.totalCents),
     })),
-    currentMonthByCategory: aggregateByCategory(current, categories).map((r) => ({
+    currentMonthByCategory: aggregateByCategory(inMonth(spending), onlyKind(categories, 'EXPENSE')).map((r) => ({
       category: r.name,
       total: euros(r.totalCents),
       transactions: r.count,
       budget: r.budgetCents === null ? null : euros(r.budgetCents),
       budgetStatus: r.budgetStatus,
     })),
-    topMerchantsLast3Months: topMerchants(expenses.filter((e) => last3.has(monthKey(e.date)))).map((m) => ({
+    currentMonthIncomeByCategory: aggregateByCategory(inMonth(income), onlyKind(categories, 'INCOME')).map((r) => ({
+      category: r.name,
+      total: euros(r.totalCents),
+    })),
+    topMerchantsLast3Months: topMerchants(spending.filter((e) => last3.has(monthKey(e.date)))).map((m) => ({
       merchant: m.merchant.slice(0, 40),
       total: euros(m.totalCents),
       transactions: m.count,
@@ -100,11 +111,11 @@ export async function getOrCreateInsight(user, { force = false } = {}) {
   const [expenses, categories] = await Promise.all([
     prisma.expense.findMany({
       where: { userId: user.id, date: { gte: from, lt: to } },
-      select: { amountCents: true, categoryId: true, date: true, merchant: true, description: true },
+      select: { amountCents: true, categoryId: true, date: true, merchant: true, description: true, kind: true },
     }),
     prisma.category.findMany({ where: { userId: user.id } }),
   ]);
-  if (expenses.length === 0) throw badRequest('Añade algunos gastos antes de pedir un análisis', 'NO_DATA');
+  if (expenses.length === 0) throw badRequest('Añade algunos movimientos antes de pedir un análisis', 'NO_DATA');
 
   const pro = planLimits(user.plan).proInsights;
   const input = buildInsightInput({ month, expenses, categories });
