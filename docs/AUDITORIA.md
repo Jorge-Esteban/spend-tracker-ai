@@ -71,7 +71,7 @@ La v1 funcionaba como demo local pero tenía fallos que la hacían inutilizable 
 
 ## Verificado en vivo
 
-- Tink Data v2 con Demo Bank: canje del código, cuentas, paginación y forma de las transacciones (`amount.value.{unscaledValue,scale}`, `descriptions`, `dates.booked`, `types.type`, `status`). Una cuenta devolvió 2.000 movimientos: por eso ahora se piden solo los últimos 12 meses.
+- Tink Data v2 con Demo Bank: canje del código, cuentas, paginación y forma de las transacciones (`amount.value.{unscaledValue,scale}`, `descriptions`, `dates.booked`, `types.type`, `status`). Una cuenta devolvió 2.000 movimientos: por eso ahora se piden solo los últimos 12 meses. Demo Bank usa `scale: "1"` (p. ej. `unscaledValue: "10800"` = 1.080,00 €), que el conversor con BigInt resuelve bien, y sus movimientos «Payment» llegan en positivo: se importan como ingresos.
 - Llamadas reales a Claude (categorización por tipo e insights FREE/PRO) con salidas estructuradas.
 
 ## Pendiente de verificar
