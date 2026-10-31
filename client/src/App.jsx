@@ -31,7 +31,8 @@ export default function App() {
   // Se incrementa tras cualquier cambio de datos para que las vistas recarguen.
   const [version, setVersion] = useState(0);
   const bump = useCallback(() => setVersion((v) => v + 1), []);
-  const isCallback = window.location.pathname === '/bank/callback';
+  // Vuelta de Tink: /bank/callback (recomendada) o /callback (redirect URI de la v1).
+  const isCallback = ['/bank/callback', '/callback'].includes(window.location.pathname);
 
   const loadCategories = useCallback(async () => {
     const d = await api.get('/categories');

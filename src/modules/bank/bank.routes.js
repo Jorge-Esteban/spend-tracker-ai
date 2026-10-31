@@ -56,6 +56,17 @@ export function shapeOf(value, depth = 0) {
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shapeOf(v, depth + 1)]));
 }
 
+/** Recuento por tipo de Tink y signo del importe (agregado, sin importes ni textos). */
+export function typeMix(transactions) {
+  const mix = {};
+  for (const tx of transactions) {
+    const sign = String(tx?.amount?.value?.unscaledValue ?? '').startsWith('-') ? 'negativo' : 'positivo';
+    const key = `${tx?.types?.type ?? 'SIN_TIPO'}/${sign}`;
+    mix[key] = (mix[key] ?? 0) + 1;
+  }
+  return mix;
+}
+
 export const bankRouter = Router();
 
 // Estado honesto: no se guarda ningún token, cada importación es puntual.
@@ -89,9 +100,23 @@ bankRouter.post('/import', async (req, res) => {
   const { expenses, skipped } = parseTinkTransactions(transactions);
   // Diagnóstico sin datos personales: solo nombres de campos, para detectar cambios en la API de Tink.
   req.log.info(
-    { accounts, fetched: transactions.length, skipped, sampleKeys: shapeOf(transactions[0]) },
+    { accounts, fetched: transactions.length, skipped, sampleKeys: shapeOf(transactions[0]), mix: typeMix(transactions) },
     'Importación Tink',
   );
+  if (env.TINK_TEST_MODE) {
+    // Solo con datos sintéticos de Demo Bank: ejemplos con valores para depurar el parser.
+    req.log.info(
+      {
+        sample: transactions.slice(0, 5).map((t) => ({
+          display: t.descriptions?.display,
+          value: t.amount?.value,
+          type: t.types?.type,
+          status: t.status,
+        })),
+      },
+      'Tink (modo test): muestra',
+    );
+  }
   const result = await saveBankExpenses(req.user, expenses);
 
   res.json({ accounts, fetched: transactions.length, skipped, ...result });

@@ -17,7 +17,7 @@ export default function BankCallback({ onDone }) {
     const code = params.get('code');
     const state = params.get('state');
     // Quita code/state de la barra de direcciones y del historial.
-    window.history.replaceState({}, '', '/bank/callback');
+    window.history.replaceState({}, '', window.location.pathname);
 
     if (!code || !state) {
       setError(params.get('message') || 'Tink no devolvió autorización (¿cancelaste la conexión?).');

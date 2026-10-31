@@ -77,10 +77,16 @@ export async function paginate(fetchImpl, path, params, key, token) {
   return items;
 }
 
-export async function fetchAllTransactions(accessToken, fetchImpl = fetch) {
+// Ventana de importación: los últimos 12 meses bastan para presupuestos y tendencia.
+export function importSince(now = new Date()) {
+  const d = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate()));
+  return d.toISOString().slice(0, 10);
+}
+
+export async function fetchAllTransactions(accessToken, fetchImpl = fetch, since = importSince()) {
   const accounts = await paginate(fetchImpl, '/data/v2/accounts', [], 'accounts', accessToken);
   if (accounts.length === 0) return { accounts: 0, transactions: [] };
-  const params = accounts.map((a) => ['accountIdIn', a.id]);
+  const params = [...accounts.map((a) => ['accountIdIn', a.id]), ['bookedDateGte', since]];
   const transactions = await paginate(fetchImpl, '/data/v2/transactions', params, 'transactions', accessToken);
   return { accounts: accounts.length, transactions };
 }

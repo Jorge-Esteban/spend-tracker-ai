@@ -98,6 +98,7 @@ describe('cliente Tink', () => {
     const url = new URL(fetchImpl.mock.calls[1][0]);
     expect(url.pathname).toBe('/data/v2/transactions');
     expect(url.searchParams.getAll('accountIdIn')).toEqual(['a1', 'a2']);
+    expect(url.searchParams.get('bookedDateGte')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('traduce un 401 de Tink a un error 400 seguro', async () => {
