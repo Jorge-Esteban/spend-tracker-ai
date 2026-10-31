@@ -15,7 +15,7 @@ import { useTheme } from './theme.js';
 
 const TABS = [
   { id: 'dashboard', label: 'Resumen' },
-  { id: 'expenses', label: 'Gastos' },
+  { id: 'expenses', label: 'Movimientos' },
   { id: 'budgets', label: 'Presupuestos' },
   { id: 'analysis', label: 'Análisis IA' },
   { id: 'bank', label: 'Banco' },

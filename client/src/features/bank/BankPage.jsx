@@ -32,7 +32,7 @@ export default function BankPage({ version }) {
       {status && (
         <div className="card stack">
           <p>
-            Importa tus cargos mediante <strong>Tink</strong> (open banking). Cada importación es puntual: la app no guarda
+            Importa tus gastos e ingresos mediante <strong>Tink</strong> (open banking). Cada importación es puntual: la app no guarda
             acceso permanente a tu cuenta, y los movimientos ya importados no se duplican.
           </p>
           {status.testMode && (

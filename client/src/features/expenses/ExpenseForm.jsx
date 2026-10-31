@@ -3,16 +3,20 @@ import { api, errorMessage } from '../../api.js';
 import { Alert } from '../../components/ui.jsx';
 import { todayIso } from '../../format.js';
 
-const empty = () => ({ amount: '', description: '', merchant: '', date: todayIso(), categoryId: '' });
+const empty = (kind = 'EXPENSE') => ({ kind, amount: '', description: '', merchant: '', date: todayIso(), categoryId: '' });
 
 const ORIGIN_LABEL = { USER: 'elegida por ti', RULE: 'por una regla aprendida', AI: 'por la IA', FALLBACK: 'por defecto' };
 
 export default function ExpenseForm({ categories, onCreated }) {
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState(() => empty());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
+  const isIncome = form.kind === 'INCOME';
+  const options = categories.filter((c) => c.kind === form.kind);
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  // Al cambiar de tipo, la categoría elegida deja de valer.
+  const setKind = (kind) => setForm((f) => ({ ...f, kind, categoryId: '' }));
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -20,16 +24,17 @@ export default function ExpenseForm({ categories, onCreated }) {
     setMessage(null);
     try {
       const { expense } = await api.post('/expenses', {
+        kind: form.kind,
         amount: form.amount,
         description: form.description,
         merchant: form.merchant || undefined,
         date: form.date,
         categoryId: form.categoryId || undefined,
       });
-      setForm(empty());
+      setForm(empty(form.kind));
       setMessage({
         kind: 'success',
-        text: `Guardado en ${expense.category.icon} ${expense.category.name} (${ORIGIN_LABEL[expense.categorizedBy]}).`,
+        text: `${isIncome ? 'Ingreso' : 'Gasto'} guardado en ${expense.category.icon} ${expense.category.name} (${ORIGIN_LABEL[expense.categorizedBy]}).`,
       });
       onCreated();
     } catch (err) {
@@ -41,17 +46,43 @@ export default function ExpenseForm({ categories, onCreated }) {
 
   return (
     <form className="card form-grid" onSubmit={onSubmit}>
-      <h3 className="span-all">Nuevo gasto</h3>
+      <div className="span-all form-head">
+        <h3>Nuevo movimiento</h3>
+        <div className="segmented kind-toggle" role="radiogroup" aria-label="Tipo de movimiento">
+          {[
+            ['EXPENSE', 'Gasto'],
+            ['INCOME', 'Ingreso'],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={form.kind === value}
+              className={form.kind === value ? `active ${value.toLowerCase()}` : ''}
+              onClick={() => setKind(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <label>
         Importe (€)
         <input name="amount" inputMode="decimal" placeholder="12,50" required pattern="\d+([.,]\d{1,2})?" value={form.amount} onChange={onChange} />
       </label>
       <label>
         Descripción
-        <input name="description" required maxLength={200} placeholder="Cena con amigos" value={form.description} onChange={onChange} />
+        <input
+          name="description"
+          required
+          maxLength={200}
+          placeholder={isIncome ? 'Nómina de octubre' : 'Cena con amigos'}
+          value={form.description}
+          onChange={onChange}
+        />
       </label>
       <label>
-        Comercio
+        {isIncome ? 'Pagador' : 'Comercio'}
         <input name="merchant" maxLength={120} placeholder="Opcional" value={form.merchant} onChange={onChange} />
       </label>
       <label>
@@ -62,7 +93,7 @@ export default function ExpenseForm({ categories, onCreated }) {
         Categoría
         <select name="categoryId" value={form.categoryId} onChange={onChange}>
           <option value="">✨ Automática</option>
-          {categories.map((c) => (
+          {options.map((c) => (
             <option key={c.id} value={c.id}>
               {c.icon} {c.name}
             </option>

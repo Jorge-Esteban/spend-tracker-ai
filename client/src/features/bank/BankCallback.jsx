@@ -36,9 +36,9 @@ export default function BankCallback({ onDone }) {
       {error && <Alert kind="error">{error}</Alert>}
       {result && (
         <Alert kind="success">
-          {result.imported} movimientos importados de {result.accounts} cuenta(s).
+          {result.imported} movimientos importados de {result.accounts} cuenta(s): {result.importedExpenses} gastos y{' '}
+          {result.importedIncome} ingresos.
           {result.duplicates > 0 && ` ${result.duplicates} ya existían.`}
-          {result.skipped.income > 0 && ` ${result.skipped.income} ingresos ignorados.`}
           {result.skipped.pending > 0 && ` ${result.skipped.pending} pendientes ignorados.`}
           {result.skippedByQuota > 0 && ` ${result.skippedByQuota} no caben en tu cuota mensual FREE.`}
         </Alert>

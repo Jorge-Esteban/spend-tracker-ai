@@ -36,7 +36,7 @@ export default function BudgetsPage({ month, setMonth, categories, version, onCh
       {loading && !stats && <Spinner />}
 
       <div className="grid budgets">
-        {categories.map((c) => {
+        {categories.filter((c) => c.kind === 'EXPENSE').map((c) => {
           const row = spentById.get(c.id);
           const spent = row?.totalCents ?? 0;
           const budget = c.monthlyBudgetCents;

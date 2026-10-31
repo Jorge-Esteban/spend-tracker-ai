@@ -1,18 +1,18 @@
 # 💶 Spend Tracker AI · v2
 
-Control de gastos personal **multiusuario** con categorización automática e informes generados por **Claude**, presupuestos por categoría e importación bancaria por **Tink** (open banking).
+Control de **gastos e ingresos** personal y **multiusuario** con categorización automática e informes generados por **Claude**, presupuestos por categoría e importación bancaria por **Tink** (open banking).
 
 > Proyecto de portfolio (Business Analyst / desarrollo full-stack + IA). La v2 es una reescritura completa de la v1 tras una auditoría: ver [docs/AUDITORIA.md](docs/AUDITORIA.md).
 
 ## Qué hace
 
 - **Cuentas de usuario** con sesión en cookie httpOnly. Cada usuario solo ve sus datos.
-- **Gastos** manuales con búsqueda, paginación, filtro por mes y **exportación CSV** (lista para Excel en español).
-- **Categorización automática** en tres pasos: regla aprendida del comercio → Claude (en lote) → «Otros». Si corriges una categoría, la app crea una regla y no vuelve a preguntar a la IA por ese comercio.
-- **Categorías propias** con color, icono y **presupuesto mensual**. Estado del presupuesto: correcto, alerta (≥ 80 %) o superado.
-- **Resumen** con total del mes, comparación con el mes anterior, tendencia de 12 meses y reparto por categoría.
+- **Movimientos de gasto e ingreso** con búsqueda, filtro por tipo y por mes, paginación y **exportación CSV** (lista para Excel en español).
+- **Categorización automática** en tres pasos: regla aprendida del comercio → Claude (en lote, por tipo) → categoría de reserva («Otros» u «Otros ingresos»). Si corriges una categoría, la app crea una regla y no vuelve a preguntar a la IA por ese comercio.
+- **Categorías propias** de gasto o de ingreso, con color e icono; las de gasto admiten **presupuesto mensual**. Estado del presupuesto: correcto, alerta (≥ 80 %) o superado.
+- **Resumen** con ingresos, gastos y **balance** del mes, comparación con el mes anterior, tendencia de 12 meses (ingresos y gastos) y reparto por categoría.
 - **Análisis con IA**: una sola llamada por usuario, cacheada 24 h. FREE recibe resumen, patrones y alertas; PRO además predicción del mes siguiente y recomendaciones de ahorro.
-- **Importación bancaria con Tink** (de momento solo con Demo Bank): deduplicación por id de transacción.
+- **Importación bancaria con Tink** (de momento solo con Demo Bank): cargos como gastos y abonos como ingresos, con deduplicación por id de transacción.
 - **Planes FREE / PRO**: FREE tiene un tope de 50 movimientos al mes. Ver [docs/MONETIZACION.md](docs/MONETIZACION.md).
 - Tema **claro / oscuro** que recuerda tu elección.
 
@@ -145,7 +145,7 @@ Los modelos se eligen por entorno: `CLAUDE_MODEL_INSIGHTS` y `CLAUDE_MODEL_CATEG
 ## Limitaciones conocidas
 
 - Tink solo con **Demo Bank**: la creación de apps de producción en Tink está deshabilitada para esta cuenta.
-- La forma de la respuesta de Tink Data v2 se ha implementado según la documentación y está cubierta por tests, pero **no se ha verificado en vivo**.
+- La forma de la respuesta de Tink Data v2 está **verificada en vivo** con Demo Bank. Las cuentas de Demo Bank probadas solo devolvían importes positivos (abonos).
 - PRO todavía no tiene pasarela de pago: el plan se cambia a mano en la base de datos (hoja de ruta con Stripe en [docs/MONETIZACION.md](docs/MONETIZACION.md)).
 
 ## Documentación

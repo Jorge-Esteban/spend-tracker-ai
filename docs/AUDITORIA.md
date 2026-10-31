@@ -67,8 +67,14 @@ La v1 funcionaba como demo local pero tenía fallos que la hacían inutilizable 
 7. **Se añadió la categoría «Vivienda»** a las de serie: alquiler o hipoteca suele ser el mayor gasto y en «Otros» distorsionaba el análisis.
 8. **`claim-orphans` tiene un paso previo de limpieza**: el índice único antiguo `categories.name` impediría que dos usuarios tuvieran una categoría «Comida».
 
+9. **Gastos e ingresos (añadido tras la reescritura).** La v1 solo registraba gastos y descartaba los abonos del banco. Ahora cada movimiento y cada categoría tienen tipo (`EntryKind`): el importe se guarda siempre en positivo, las categorías de un tipo no se pueden usar con el otro, los presupuestos son solo de gasto y cada tipo tiene su categoría de reserva. El modelo Prisma se sigue llamando `Expense` (colección `expenses`) para no migrar datos; en la API y la UI se habla de «movimientos».
+
+## Verificado en vivo
+
+- Tink Data v2 con Demo Bank: canje del código, cuentas, paginación y forma de las transacciones (`amount.value.{unscaledValue,scale}`, `descriptions`, `dates.booked`, `types.type`, `status`). Una cuenta devolvió 2.000 movimientos: por eso ahora se piden solo los últimos 12 meses.
+- Llamadas reales a Claude (categorización por tipo e insights FREE/PRO) con salidas estructuradas.
+
 ## Pendiente de verificar
 
-- La forma real de la respuesta de Tink Data v2 en vivo (el parser sigue la documentación).
 - La conexión con el Atlas real y el `prisma db push` sobre él (no se ha tocado la base de datos real).
 - Que los secretos filtrados en la v1 (contraseña de Mongo, client secret de Tink) están **rotados**. Ver [DEPLOY.md](DEPLOY.md#rotación-de-secretos).

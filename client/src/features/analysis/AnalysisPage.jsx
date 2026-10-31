@@ -35,7 +35,7 @@ export default function AnalysisPage({ plan }) {
         </button>
       </div>
       <p className="muted">
-        Claude analiza un resumen agregado de tus últimos 6 meses (nunca tus movimientos uno a uno). El resultado se guarda 24 h.
+        Claude analiza un resumen agregado de tus gastos e ingresos de los últimos 6 meses (nunca tus movimientos uno a uno). El resultado se guarda 24 h.
       </p>
 
       {loading && <Spinner label="Analizando tus gastos…" />}

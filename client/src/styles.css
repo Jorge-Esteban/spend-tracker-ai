@@ -132,6 +132,10 @@ h3 {
   padding: 0 1rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 .tabs button {
   border: 0;
@@ -266,6 +270,35 @@ label {
 .toolbar input {
   flex: 1;
   min-width: 200px;
+}
+.auto-width {
+  width: auto;
+}
+.form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.form-head h3 {
+  margin: 0;
+}
+.kind-toggle {
+  min-width: 220px;
+}
+.segmented button.active.expense {
+  color: var(--bad);
+}
+.segmented button.active.income {
+  color: var(--good);
+}
+.section-title {
+  margin: 0.5rem 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .pager {
   display: flex;
