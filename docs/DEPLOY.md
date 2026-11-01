@@ -79,13 +79,22 @@ El segundo rewrite de `vercel.json` (`/(.*)` → `/index.html`) hace que `/bank/
 2. Mientras la cuenta no permita apps de producción, deja `TINK_TEST_MODE=true`: Tink Link mostrará Demo Bank.
 3. Prueba una importación y revisa los logs de Railway. Si se importan 0 movimientos con `invalid` > 0, la forma real de la respuesta difiere de la documentada: ajusta `src/modules/bank/tink.parser.js` y su test.
 
-## 5. Comprobación final
+## 5. Enable Banking (bancos reales)
+
+1. En https://enablebanking.com/cp/applications, en tu app de **producción**, añade la redirect URL `https://tu-app.vercel.app/bank/callback`. Enable Banking solo acepta `https`.
+2. La app se activa en modo *restricted* al **vincular tu cuenta** («Activate by linking accounts»). Con imagin, hazlo desde el navegador del móvil.
+3. En Railway, define `ENABLE_BANKING_APP_ID`, `ENABLE_BANKING_REDIRECT_URI` y `ENABLE_BANKING_PRIVATE_KEY` con el contenido del `.pem` en una sola línea (saltos de línea como `
+`). Railway no tiene tu carpeta `secrets/`.
+4. Para probar en local: `DEV_HTTPS=true npm run client:dev` sirve `https://localhost:5173` con un certificado autofirmado (acepta el aviso del navegador).
+
+## 6. Comprobación final
 
 - [ ] `/api/health` responde.
 - [ ] Registro, login y logout funcionan; la cookie `st_session` aparece como `HttpOnly; Secure; SameSite=Lax`.
 - [ ] Con dos cuentas distintas no se ven los datos de la otra.
 - [ ] El análisis IA se genera una vez y la segunda visita responde desde caché.
 - [ ] La importación de Demo Bank trae movimientos y una segunda importación no duplica.
+- [ ] La importación desde tu banco real (Enable Banking) trae gastos e ingresos.
 - [ ] En Atlas → Network Access no queda ninguna IP personal olvidada.
 
 ## Rotación de secretos

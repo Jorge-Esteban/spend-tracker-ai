@@ -73,6 +73,7 @@ La v1 funcionaba como demo local pero tenía fallos que la hacían inutilizable 
 
 - Tink Data v2 con Demo Bank: canje del código, cuentas, paginación y forma de las transacciones (`amount.value.{unscaledValue,scale}`, `descriptions`, `dates.booked`, `types.type`, `status`). Una cuenta devolvió 2.000 movimientos: por eso ahora se piden solo los últimos 12 meses. Demo Bank usa `scale: "1"` (p. ej. `unscaledValue: "10800"` = 1.080,00 €), que el conversor con BigInt resuelve bien, y sus movimientos «Payment» llegan en positivo: se importan como ingresos.
 - Llamadas reales a Claude (categorización por tipo e insights FREE/PRO) con salidas estructuradas.
+- Enable Banking con **imagin** (cuenta real): autorización, 1 cuenta y 1.000 movimientos sin inválidos; la forma de la respuesta (`entry_reference`, `transaction_amount`, `credit_debit_indicator`, `booking_date`, `remittance_information`, `creditor`/`debtor`) coincide con el parser. Tink no da acceso a bancos reales sin contrato; Enable Banking sí, gratis y solo para las cuentas propias.
 - MongoDB Atlas real: `prisma db push` sobre la base `spendtracker` (estaba vacía: no había datos de la v1 que migrar) y prueba de punta a punta (registro, gasto, ingreso, categorización con Claude, estadísticas, CSV y transacciones). El usuario de prueba se borró después.
 
 ## Pendiente de verificar

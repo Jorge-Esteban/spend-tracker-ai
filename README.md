@@ -1,6 +1,6 @@
 # 💶 Spend Tracker AI · v2
 
-Control de **gastos e ingresos** personal y **multiusuario** con categorización automática e informes generados por **Claude**, presupuestos por categoría e importación bancaria por **Tink** (open banking).
+Control de **gastos e ingresos** personal y **multiusuario** con categorización automática e informes generados por **Claude**, presupuestos por categoría e importación bancaria por open banking: **Enable Banking** para bancos reales (probado con **imagin**) y **Tink** para el banco de demostración.
 
 > Proyecto de portfolio (Business Analyst / desarrollo full-stack + IA). La v2 es una reescritura completa de la v1 tras una auditoría: ver [docs/AUDITORIA.md](docs/AUDITORIA.md).
 
@@ -12,7 +12,7 @@ Control de **gastos e ingresos** personal y **multiusuario** con categorización
 - **Categorías propias** de gasto o de ingreso, con color e icono; las de gasto admiten **presupuesto mensual**. Estado del presupuesto: correcto, alerta (≥ 80 %) o superado.
 - **Resumen** con ingresos, gastos y **balance** del mes, comparación con el mes anterior, tendencia de 12 meses (ingresos y gastos) y reparto por categoría.
 - **Análisis con IA**: una sola llamada por usuario, cacheada 24 h. FREE recibe resumen, patrones y alertas; PRO además predicción del mes siguiente y recomendaciones de ahorro.
-- **Importación bancaria con Tink** (de momento solo con Demo Bank): cargos como gastos y abonos como ingresos, con deduplicación por id de transacción.
+- **Importación bancaria**: con **Enable Banking** desde tu banco real (más de 100 bancos españoles; verificado con imagin) y con **Tink** desde su Demo Bank. Cargos como gastos y abonos como ingresos, con deduplicación por id de transacción.
 - **Planes FREE / PRO**: FREE tiene un tope de 50 movimientos al mes. Ver [docs/MONETIZACION.md](docs/MONETIZACION.md).
 - Tema **claro / oscuro** que recuerda tu elección.
 
@@ -22,7 +22,7 @@ Control de **gastos e ingresos** personal y **multiusuario** con categorización
 |---|---|
 | Backend | Node.js (ESM), Express 5, Prisma 6.19 (MongoDB Atlas), Zod 4, pino, helmet, express-rate-limit |
 | IA | `@anthropic-ai/sdk` con salidas estructuradas (Zod) · modelos configurables por variable de entorno |
-| Banco | Tink Link + API Data v2 |
+| Banco | Enable Banking (PSD2, JWT RS256) y Tink Link + API Data v2 |
 | Frontend | Vite + React 19 + Recharts, CSS con variables |
 | Tests | Vitest + supertest + mongodb-memory-server (replica set) |
 | Despliegue | Railway (API) + Vercel (frontend, proxy `/api`) — ver [docs/DEPLOY.md](docs/DEPLOY.md) |
@@ -44,7 +44,7 @@ src/
     ├── expenses/        CRUD, listado, CSV
     ├── stats/           agregaciones puras + /api/stats
     ├── ai/              cliente Claude, categorización, insights con caché
-    ├── bank/            Tink: cliente, parser v2 puro, state firmado, importación
+    ├── bank/            Enable Banking y Tink: clientes, parsers puros, state firmado, importación
     └── usage/           cuotas por plan
 client/                  Vite + React (auth, gastos, resumen, presupuestos, análisis, banco, categorías)
 prisma/schema.prisma     modelos MongoDB
@@ -56,7 +56,7 @@ Principios: **todo el dinero en céntimos enteros**, **toda consulta filtrada po
 
 ## Puesta en marcha local
 
-Requisitos: Node.js **22 LTS** recomendado (funciona desde 20.11), una base de datos MongoDB (Atlas sirve) y, opcionalmente, claves de Anthropic y Tink.
+Requisitos: Node.js **22 LTS** recomendado (funciona desde 20.11), una base de datos MongoDB (Atlas sirve) y, opcionalmente, claves de Anthropic, Enable Banking y Tink.
 
 ```bash
 npm install
@@ -105,8 +105,8 @@ node scripts/claim-orphans.js
 npm test
 ```
 
-- **Unitarios**: dinero y fechas, agregaciones y presupuestos, CSV, parser y cliente de Tink, esquemas Zod, entorno, normalización de comercios.
-- **Integración** (API real contra MongoDB en memoria, Claude y Tink simulados): auth, aislamiento entre usuarios, validación, categorías, estadísticas, cuota FREE, caché de insights e importación bancaria.
+- **Unitarios**: dinero y fechas, agregaciones y presupuestos, CSV, parsers y clientes de Enable Banking y Tink, esquemas Zod, entorno, normalización de comercios.
+- **Integración** (API real contra MongoDB en memoria; Claude, Enable Banking y Tink simulados): auth, aislamiento entre usuarios, validación, categorías, estadísticas, cuota FREE, caché de insights e importación bancaria.
 
 La primera ejecución descarga un binario de MongoDB (unos 800 MB en Windows, casi todo símbolos de depuración). Nunca se toca tu base de datos real. Con una conexión lenta puedes usar un `mongod.exe` que ya tengas:
 
@@ -132,7 +132,8 @@ Todas las rutas salvo `auth` y `health` requieren sesión.
 | GET | `/api/expenses/export.csv?month=YYYY-MM` | CSV del mes |
 | GET | `/api/stats?month=YYYY-MM` | Totales, presupuestos, tendencia, mes anterior, uso |
 | GET | `/api/insights` · POST `/api/insights/refresh` | Análisis IA (caché 24 h) |
-| GET | `/api/bank/status` · `/api/bank/connect-url` | Estado / URL de Tink Link |
+| GET | `/api/bank/status` · `/api/bank/aspsps` | Proveedores activos / bancos disponibles (Enable Banking) |
+| GET | `/api/bank/connect-url?provider=enablebanking&aspsp=imagin` | URL de autorización del banco (`provider=tink` para Demo Bank) |
 | POST | `/api/bank/import` | Canjea `code` + `state` e importa |
 | GET | `/api/usage` | Cuota del mes |
 
@@ -144,8 +145,9 @@ Los modelos se eligen por entorno: `CLAUDE_MODEL_INSIGHTS` y `CLAUDE_MODEL_CATEG
 
 ## Limitaciones conocidas
 
-- Tink solo con **Demo Bank**: la creación de apps de producción en Tink está deshabilitada para esta cuenta.
-- La forma de la respuesta de Tink Data v2 está **verificada en vivo** con Demo Bank. Las cuentas de Demo Bank probadas solo devolvían importes positivos (abonos).
+- **Enable Banking** funciona en modo *restricted production*: gratis, pero solo con las cuentas que vinculas tú en su panel. Para que otros usuarios conecten sus bancos hace falta un contrato con Enable Banking.
+- **imagin** aparece como «beta» en Enable Banking. La importación real funciona, pero tarda (unos 2 minutos con 1.000 movimientos).
+- **Tink** solo con **Demo Bank**: las apps de producción de Tink requieren un contrato y verificación de empresa.
 - PRO todavía no tiene pasarela de pago: el plan se cambia a mano en la base de datos (hoja de ruta con Stripe en [docs/MONETIZACION.md](docs/MONETIZACION.md)).
 
 ## Documentación
